@@ -25,3 +25,6 @@ noise and pitch modulation unused.
 SPU IRQ address (register kept as storage), capture buffers, sweep volumes (end value), 25-point XA resampler, 8-bit XA, exact transfer timing (instantaneous).
 
 Origin: f2b#0011, 0025, 0029.
+
+## Validation against an independent emulator (observed)
+XA audio of a movie intro: loudness envelope correlation 0.948 (after a constant boot-time shift), waveform correlation 0.938 on an aligned 4000-sample window. Our output was ~1.26× the reference's although the program's volume registers (identity CD attenuator, main `3FFF`, CD input `7FFF`) are applied as documented: cause unresolved (reference mixer scaling not inspected). Cross-correlate on loud segments (silent windows divide by zero) and re-align per window.

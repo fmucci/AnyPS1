@@ -6,3 +6,4 @@
 - 2026-10-17 · 06-gpu: rasteriser validated against an independent emulator (99.7 % identical pixels), the two fixes (untextured semi mode from E1, rounded attribute interpolation), presenter must apply GP1(07).
 - 2026-10-17 · 10-spu: XA validation against an independent emulator (shape matches, gain 1.26× unexplained).
 - 2026-10-17 · 10-spu: XA level agrees within 3 % once the reference's default 75 % output volume is accounted for.
+- 2026-10-17 · 06-gpu: conformance battery method; poly-lines and line stepping (99.61 % → 99.90 % identical pixels vs an independent emulator).

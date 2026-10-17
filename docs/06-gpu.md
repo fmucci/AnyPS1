@@ -15,9 +15,7 @@
 ## Rendering model (software, written from psx-spx)
 Polygons flat/gouraud/textured (4-bit and 8-bit CLUT, 15-bit), raw/modulated, semi-transparency modes 0..3, ordered dither matrix on shaded
 pixels, mask-bit set/test, draw area clip, draw offset, texture window, rectangles with X/Y flip (E1 bits 12/13), DDA lines, fill/copy/upload/download.
-**Limits (unverified against hardware):** barycentric interpolation with truncation, not the hardware's incremental interpolators (colour
-off by one LSB possible); no 1/16 sub-pixel rule; instantaneous drawing; lines are plain DDA. No reference comparison was possible (no recorded
-hardware frames, no runnable reference renderer): this is the largest unvalidated area.
+**Validation (observed):** frames compared with an independent emulator's neon GPU plugin at the same game state: after two fixes **99.70 %** identical pixels on a 3D gameplay frame and **99.56 %** on a 2D menu frame. The fixes: (1) *untextured* semi-transparent polygons take the blend mode from the draw mode (E1 / GPUSTAT bits 5-6), like rectangles and lines — a texture-page word does not exist for them; (2) interpolated vertex colours **and** texture coordinates must be *rounded* (`+ area/2` in the barycentric division), not truncated (rounding UV alone: 97.0 %, colour alone: 86.0 %, both: 99.7 %). Remaining 0.3 %: polygon edge pixels. **Limits:** barycentric rather than the hardware's incremental interpolators; no 1/16 sub-pixel rule; instantaneous drawing; lines are plain DDA; both implementations are not hardware, so agreement shows consistency, not exactness. A presenter must apply the vertical display range GP1(07) (a 14-line offset appeared when it was ignored).
 
 ## Observed usage patterns (useful to know what to test)
 All of dither on/off, semi-transparency modes 0..3 and 4/8/15-bit textures occur in real 3D game frames; the mask bit stayed off in the programs

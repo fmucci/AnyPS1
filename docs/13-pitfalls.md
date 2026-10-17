@@ -19,7 +19,8 @@
 | 15 | UBSan: left shift of negative value in fixed-point code | `(t << 12)` on a negative sample | multiply instead of shifting |
 | 16 | `timeout` missing, long `sleep` blocked (macOS, agent shells) | platform | `perl -e 'alarm N; exec @ARGV'`; poll files with `until` loops |
 | 17 | Overlay's own code stops the program with a fatal "store into recompiled code" after the overlay is freed | memory reused by the guest allocator | unregister the module on the first store (02) |
-| 18 | Waiting on an event forever after returning from an overlay | a Stop→Exec→Reset sequence wiped DMA/IRQ enables and nothing re-registers the SPU callback | open: see 14 |
+| 18 | Waiting on an event forever after returning from an overlay (SPU transfer never completes) | a Stop→Exec→Reset sequence wiped DMA/IRQ enables; the program's wait only ends because a BIOS `CdRemove` closed the *stale* CD-event handle that now names the SPU event | model the BIOS's 5 CD events in slots 0..4 and CdRemove closing their stored handles (04); found by running the same program in an independent emulator and diffing the event table |
+| 19 | No reference for a behaviour question | no console/BIOS image available | run the program in an independent emulator with scripted input and a PC/BIOS-call trace (see 00); treat its HLE BIOS as evidence, not truth |
 
 ## Tooling notes
 Disassemblers can mis-decode COP2 in delay slots and tiny leaf functions without prologues; check raw words. A raw-word scan for `mfc0/mtc0` finds

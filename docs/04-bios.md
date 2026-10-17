@@ -4,9 +4,9 @@ Entry: programs call the kernel by jumping to `0xA0/0xB0/0xC0` with the function
 the BIOS ROM, which a port does not have).
 
 ## Implemented and proven (observed to be reached by five executables)
-- **Events** (B 07h..0Dh, 20h): `OpenEvent(class, spec, mode, func)` returns `0xF1000000 + slot` (slots 0..4 reserved for the kernel);
+- **Events** (B 07h..0Dh, 20h): `OpenEvent(class, spec, mode, func)` returns `0xF1000000 + slot`; of the default 16 slots **five belong to the BIOS's CD code** (class `F0000003`, specs `10h 20h 40h 80h 8000h`, psx-spx) and exist from the start in slots 0..4;
   `EnableEvent/DisableEvent/CloseEvent/TestEvent/WaitEvent/DeliverEvent/UndeliverEvent`. Mode `0x1000` = run the callback, `0x2000` = set
-  "ready" (polled by Test/WaitEvent). `WaitEvent` must let virtual time pass (it spins calling the frame hook), otherwise nothing can ever deliver the event.
+  "ready" (polled by Test/WaitEvent). `WaitEvent` semantics (as in the independent HLE kernel): status *ready* → set active and return 1; status *not active* (closed/disabled/unknown) → return 0 immediately; status *active* → block. It must let virtual time pass (it spins calling the frame hook), otherwise nothing can ever deliver the event.
 - Event classes (psx-spx list): `F0000001` vblank, `F0000008` joypad IRQ7, `F0000009` SPU IRQ9, `F2000000..03` root counters (3 = software vblank
   timer), `F4000001` memory-card high-level, `F0000011` memory-card sector level. The kernel alone delivers a few of them; **libraries also call
   `DeliverEvent` themselves** (observed: an SPU DMA-completion callback delivers `F0000009/0020` to wake a `WaitEvent`).
@@ -21,6 +21,7 @@ the BIOS ROM, which a port does not have).
   C 0Ah ChangeClearRCnt, B 35h/36h file write (stdout capture) — all as no-op or flag contracts taken from psx-spx.
 - **Memory-card calls**: see 11. Completion events are *deferred to the next frame*: delivering them inside the call, before the program enabled its
   callbacks, lost them.
+- **`A(72h)` CdRemove** closes the five stored CD-event handles (`F1000000..F1000004`) *every time it is called*, whatever event occupies those slots by then. Programs call it from their callback-library reset; after an earlier CdRemove freed the slots, later program events (e.g. an SPU-transfer event) are allocated there, and a second CdRemove closes them. `WaitEvent` on a closed/unknown handle returns 0 at once. Modelling this made a program continue past a point where it otherwise waited forever (inferred real behaviour; see 14).
 - Unimplemented calls abort naming `A/B/C(n)`.
 
 ## Pad

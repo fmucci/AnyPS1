@@ -9,3 +9,4 @@
 - **AnyPS5**: structure/method inspiration (static knowledge → translator → verification), not code.
 
 Rule for contributors: facts go in with a tag and a way to re-check; third-party code does not.
+- **PCSX-ReARMed** (libretro core, interpreter + HLE BIOS): run headless as an independent behavioural reference with local instrumentation (see 00). GPL code: instrumented copies stay local.

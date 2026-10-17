@@ -38,3 +38,6 @@ store watch resolved most "why is this value zero" questions in minutes.
 Unit tests for each device with hand-derived expectations; differential tests (C vs spec on random fragments and states, C vs oracle on
 whole executables); a mutation check (deliberately broken rules must be detected); a reference-implementation check per device where one exists; a
 whole-program smoke test with scripted input.
+
+## Independent emulator as a behavioural oracle
+When no console/BIOS is available, run the same disc in an independent emulator with a built-in HLE BIOS (headless libretro host: scripted pad, N frames, frame dumps). Add *local* instrumentation (not committed if the emulator's licence forbids derivatives): PC list with registers, DMA/IRQ register writes, BIOS call arguments, RAM-word change poll with the changing PC. Use it to answer "does this sequence complete" and to locate the first divergence in kernel-visible state (an event-table word changing to 0 explained a hang in minutes). Its HLE BIOS is a re-implementation: evidence, not ground truth. Frames it produces are game content: keep them out of version control.

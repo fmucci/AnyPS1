@@ -27,4 +27,4 @@ SPU IRQ address (register kept as storage), capture buffers, sweep volumes (end 
 Origin: f2b#0011, 0025, 0029.
 
 ## Validation against an independent emulator (observed)
-XA audio of a movie intro: loudness envelope correlation 0.948 (after a constant boot-time shift), waveform correlation 0.938 on an aligned 4000-sample window. Our output was ~1.26× the reference's although the program's volume registers (identity CD attenuator, main `3FFF`, CD input `7FFF`) are applied as documented: cause unresolved (reference mixer scaling not inspected). Cross-correlate on loud segments (silent windows divide by zero) and re-align per window.
+XA audio of a movie intro: loudness envelope correlation 0.948 (after a constant boot-time shift), waveform correlation 0.938 on an aligned 4000-sample window. The apparent 1.26× gain was the *reference's* default 75 % output volume; with it set to 1.0 the gain is 0.968 and the waveform correlation 0.964 (resampling differences account for the rest). Always check a reference emulator's own output-volume setting before blaming the mixer. Cross-correlate on loud segments (silent windows divide by zero) and re-align per window.

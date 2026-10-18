@@ -10,3 +10,5 @@
 7. **Second memory-card slot, multitap, analog pads, light guns**: not exercised.
 8. **Region differences** (PAL/NTSC, BIOS versions): only one disc and no BIOS were used.
 9. **Linux/other hosts**: the toolchain was only exercised on macOS (arm64, Apple clang).
+
+Documented leads for these questions (hardware test programs with shipped expected outputs, an open-source BIOS, SIO/multitap notes) are listed per question in 16.

@@ -21,7 +21,7 @@
 7. **Virtual time.** No wall clock inside the emulated machine (see 05). Determinism is what makes differential testing possible.
 
 ## Evidence rules
-- Tag: **observed** (reproducible command or evidence), **inferred** (reasoning), **unknown**.
+- Tag: **observed** (reproducible command or evidence), **documented** (stated by an external source we consulted, named in 16, not reproduced by our own test), **inferred** (reasoning), **unknown**. A documented fact that one of our tests confirms becomes observed; one that a test contradicts is recorded as *differs* with both results.
 - A result nobody else can regenerate is not a result.
 - When an independent implementation exists (another emulator's source), read it to check *behaviour*, record what it does, and keep the
   verdict: confirmed / differs / no independent source. Never copy its code.

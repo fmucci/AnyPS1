@@ -10,3 +10,5 @@
 
 Rule for contributors: facts go in with a tag and a way to re-check; third-party code does not.
 - **PCSX-ReARMed** (libretro core, interpreter + HLE BIOS): run headless as an independent behavioural reference with local instrumentation (see 00). GPL code: instrumented copies stay local.
+
+The wider catalogue (hardware test programs, open BIOS/SDK sources, emulator sources, licence rules and which open question each can settle) is in 16.

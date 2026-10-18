@@ -7,3 +7,4 @@
 - 2026-10-17 · 10-spu: XA validation against an independent emulator (shape matches, gain 1.26× unexplained).
 - 2026-10-17 · 10-spu: XA level agrees within 3 % once the reference's default 75 % output volume is accounted for.
 - 2026-10-17 · 06-gpu: conformance battery method; poly-lines and line stepping (99.61 % → 99.90 % identical pixels vs an independent emulator).
+- 2026-10-18 · new 16-documented-sources: catalogue of external specs, hardware test programs (ps1-tests etc.), open BIOS/SDK and emulator sources with licence rules and the open question each can settle; new evidence tag **documented** (00); 04: open-source BIOS agrees with the CD-event/CdRemove model.

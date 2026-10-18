@@ -8,7 +8,7 @@ tooling method) while porting one commercial title, with **nothing that belongs 
 Platform facts only: instruction semantics, how to translate and test them, the BIOS/hardware surface a recompiled program needs,
 the register-level behaviour of each device, SDK-library conventions seen across executables, the pitfalls that cost time, and the
 questions that are still open. Every statement is tagged **observed** (with how to re-check it), **inferred** (reasoning, not verified) or
-**unknown**.
+**unknown**; knowledge taken from an external source and not yet reproduced is tagged **documented** (see 16).
 
 ## What is deliberately not in here
 - No game data, binaries, disc contents, screenshots, VRAM/audio dumps, file names or directory listings of any title.
@@ -35,6 +35,7 @@ questions that are still open. Every statement is tagged **observed** (with how 
 | [13-pitfalls](docs/13-pitfalls.md) | things that failed before |
 | [14-open-questions](docs/14-open-questions.md) | what is still unknown on the platform side |
 | [15-sources](docs/15-sources.md) | references and how they were used |
+| [16-documented-sources](docs/16-documented-sources.md) | external specs, hardware tests, open BIOS/SDK and emulator sources, licence rules, which open question each can settle |
 | [CHANGELOG](CHANGELOG.md) | what was added when |
 
 ## How to update

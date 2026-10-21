@@ -42,3 +42,6 @@
 See 05.
 
 Origin: f2b#0017–0023, 0027.
+
+## Portability across hosts (observed)
+The runtime and the hardware model are plain C (standard library plus `setjmp`), so the same sources built with Apple clang (arm64), GCC (aarch64 Linux) and MinGW-w64 (x86-64 Windows, under Wine) produced a **byte-identical frame after tens of thousands of virtual frames**. Virtual time (no wall clock in the machine) and a single C hardware model are what make this possible; a cross-host hash comparison is a cheap determinism test. Things that did differ between hosts: GCC enabled `-Wimplicit-fallthrough` where clang did not (write `/* fall through */` before the next case label); test code must not rely on POSIX-only calls (`mkstemp`, `/tmp`, `unistd.h`); Wine's package installs `wine64` under a library directory rather than a `wine` command. Keep compiler, executable suffix, shared-library extension and SDL flags in one host-environment module.

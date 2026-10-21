@@ -9,6 +9,6 @@
 6. **SPU details**: sweep volumes, SPU IRQ, capture buffers, XA 25-point resampler, 8-bit XA.
 7. **Second memory-card slot, multitap, analog pads, light guns**: not exercised.
 8. **Region differences** (PAL/NTSC, BIOS versions): only one disc and no BIOS were used.
-9. **Linux/other hosts**: the toolchain was only exercised on macOS (arm64, Apple clang).
+9. **Other hosts**: the toolchain ran on macOS (arm64, Apple clang), on Linux (aarch64, GCC, in a container) and as a Windows x86-64 cross build (MinGW-w64) run under Wine; not on native Windows or x86-64 Linux, and not with MSVC. See 02 for what portability needed.
 
 Documented leads for these questions (hardware test programs with shipped expected outputs, an open-source BIOS, SIO/multitap notes) are listed per question in 16.

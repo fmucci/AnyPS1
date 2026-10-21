@@ -14,3 +14,5 @@
 - 2026-10-22 · 04: pad polled from an F2000003 vblank event callback; 13: input ignored when the callback's registration was stubbed or the callback was never discovered.
 - 2026-10-22 · 02: callbacks discovery cannot see (explicit roots + unresolved-pointer lister); re-audit early stubs.
 - 2026-10-22 · 06: hardware-exact rules from public test programs (plane-gradient interpolation with leftmost-vertex origin, flip, VRAM copy rows, line dither, texture-disable bit, mask bit); 09: full block without end-of-block; 14/16/13/00: provenance caveat, pitfalls, method.
+- 2026-10-22 · 05: host frame pacing (wait, present, sample input) and how to tell port jitter from the game's own frame rate.
+- 2026-10-22 · 16: section E (other PS1 recompilation projects, licences, what they offer per open question); 06: X-flip `u|1` now documented by a second source.

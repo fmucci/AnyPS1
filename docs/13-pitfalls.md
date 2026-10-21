@@ -22,6 +22,8 @@
 | 18 | Waiting on an event forever after returning from an overlay (SPU transfer never completes) | a Stop→Exec→Reset sequence wiped DMA/IRQ enables; the program's wait only ends because a BIOS `CdRemove` closed the *stale* CD-event handle that now names the SPU event | model the BIOS's 5 CD events in slots 0..4 and CdRemove closing their stored handles (04); found by running the same program in an independent emulator and diffing the event table |
 | 19 | No reference for a behaviour question | no console/BIOS image available | run the program in an independent emulator with scripted input and a PC/BIOS-call trace (see 00); treat its HLE BIOS as evidence, not truth |
 
+- **A sequence never advances, nothing faults** → a busy-wait on a status bit the model never changes (GPUSTAT bit 31 field flag, see 06). Find the loop from the last pc, decode the load address, implement the bit.
+
 ## Tooling notes
 Disassemblers can mis-decode COP2 in delay slots and tiny leaf functions without prologues; check raw words. A raw-word scan for `mfc0/mtc0` finds
 data. Keep generated C and every game-derived artefact out of version control.

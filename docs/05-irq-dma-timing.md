@@ -29,3 +29,6 @@ Registers only (value/mode/target); timer modes, targets and IRQs are not modell
 DMA timing and chopping, GPU timing, nested interrupts.
 
 Origin: f2b#0022, 0025, 0027.
+
+## Root counter 2 drives a game's sound sequencer (observed)
+A program may program root counter 2 **directly through its registers** (no BIOS `SetRCnt` call) as the tick of its sound sequencer: mode `0x258` = sysclk/8 (bits 8-9 = 2), reset on target (bit 3), IRQ on target (bit 4), repeat (bit 6), target `0xA560` = 42336, i.e. 33 868 800 / (8 × 42336) = 100 interrupts per second, with I_MASK bit 6 (IRQ6) enabled. A model that advances the counter but never raises IRQ6 gives a game that runs and draws normally but plays **no music or effects** (no voice is ever keyed on). Model: clock = sysclk (mode bits 8-9 = 0/1) or sysclk/8 (2/3); sync modes 0 and 3 stop the counter; with bit 3 the counter counts 0..target and resets (period target + 1), otherwise it wraps at 0xFFFF; IRQ on target (bit 4) and/or overflow (bit 5); repeat (bit 6) or one shot. Because the virtual frame is 1/60 s and the tick is 100 Hz, **several interrupts per frame must be queued and delivered one by one** (1.67 per frame here). Verify by counting voice key-ons per second. Not modelled: counters 0 and 1 interrupts (dot clock, hblank sources), counter 2 synchronisation modes 1 and 2.

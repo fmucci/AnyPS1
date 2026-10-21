@@ -24,6 +24,8 @@
 
 - **A sequence never advances, nothing faults** → a busy-wait on a status bit the model never changes (GPUSTAT bit 31 field flag, see 06). Find the loop from the last pc, decode the load address, implement the bit.
 
+- **The game draws and runs but plays no music or effects** → no voice key-ons: look for an unmodelled timer interrupt (root counter 2 at 100 Hz drives a sequencer, see 05). Compare key-on counts or audio RMS per second against an independent emulator.
+
 ## Tooling notes
 Disassemblers can mis-decode COP2 in delay slots and tiny leaf functions without prologues; check raw words. A raw-word scan for `mfc0/mtc0` finds
 data. Keep generated C and every game-derived artefact out of version control.

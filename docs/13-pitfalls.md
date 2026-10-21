@@ -26,6 +26,8 @@
 
 - **The game draws and runs but plays no music or effects** → no voice key-ons: look for an unmodelled timer interrupt (root counter 2 at 100 Hz drives a sequencer, see 05). Compare key-on counts or audio RMS per second against an independent emulator.
 
+- **A program ignores input although the pad value reaches its buffer** → the code that reads the pad is a vblank event callback (`OpenEvent(F2000003, 2, 0x1000, func)`): if the routine that registers it was replaced by an early stub, or the callback has no recognisable start (no prologue, no `jr ra` before it) so discovery never emitted it, it never runs. Remove stale stubs once the event layer exists and give discovery explicit roots for such callbacks.
+
 ## Tooling notes
 Disassemblers can mis-decode COP2 in delay slots and tiny leaf functions without prologues; check raw words. A raw-word scan for `mfc0/mtc0` finds
 data. Keep generated C and every game-derived artefact out of version control.

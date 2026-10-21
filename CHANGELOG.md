@@ -11,3 +11,5 @@
 - 2026-10-21 · 06-gpu: GPUSTAT bit 31 field flag alternates per field in interlace mode (programs busy-wait on it); 13: silent freezes are often status-bit waits.
 - 2026-10-21 · 02: cross-host portability (identical frames on macOS/Linux/MinGW+Wine, what differed); 14: question 9 updated.
 - 2026-10-21 · 05: root counter 2 as a sound-sequencer tick (100 Hz, several interrupts per frame); 13: silent game with normal video = missing timer interrupt.
+- 2026-10-22 · 04: pad polled from an F2000003 vblank event callback; 13: input ignored when the callback's registration was stubbed or the callback was never discovered.
+- 2026-10-22 · 02: callbacks discovery cannot see (explicit roots + unresolved-pointer lister); re-audit early stubs.

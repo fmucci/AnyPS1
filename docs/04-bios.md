@@ -33,3 +33,6 @@ The kernel vblank event for the pad must exist (`F2000003/2`): without it the pr
 Real kernel register state at `DoExecute` (SR after boot was chosen `0x401`: IE + IM2); exact kernel register values at callback entry.
 
 Origin: f2b#0022, 0023, 0027.
+
+## Pad polling as a vblank event callback (observed)
+A program can poll the pad from an event callback instead of its main loop: `OpenEvent(0xF2000003, 2, 0x1000, func)` (root counter 3 = software vblank, mode 0x1000 = run the callback), then `EnableEvent`, then a start-root-counter call. The BIOS side must deliver `F2000003/0002` once per vblank and run the callback (psx-spx class list). A reference emulator's HLE BIOS calls such callbacks from its own trampoline (return address in the BIOS area), which is a quick way to see that a callback exists.

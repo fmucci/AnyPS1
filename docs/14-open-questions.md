@@ -1,6 +1,6 @@
 # 14 — Open questions (platform side)
 
-1. **Hardware validation.** CPU semantics were checked against psx-spx and one independent emulator, not against a console or hardware test
+1. **Hardware validation.** *Partly answered (see 06 and 16 B1): GPU output is pixel-identical to the PNGs of public test programs whose capture provenance is not stated; still no first-hand console run.* CPU semantics were checked against psx-spx and one independent emulator, not against a console or hardware test
    programs. GPU rasterisation and SPU output were never compared with any reference (no recorded hardware output, no runnable reference renderer).
 2. **BIOS event-slot lifecycle**: the CD events in slots 0..4 and the `CdRemove` closing stale handles are *inferred* (documented 5 BIOS CD events; an independent HLE kernel shows the same effect). The real BIOS's handle variable and slot assignment were not verified; if a program's event lands outside slots 0..4 the effect changes.
 3. **Kernel area content** read through null pointers: the real BIOS values are unknown; sensitivity tests show no visible effect so far.

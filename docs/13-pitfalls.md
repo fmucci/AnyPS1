@@ -28,6 +28,8 @@
 
 - **A program ignores input although the pad value reaches its buffer** → the code that reads the pad is a vblank event callback (`OpenEvent(F2000003, 2, 0x1000, func)`): if the routine that registers it was replaced by an early stub, or the callback has no recognisable start (no prologue, no `jr ra` before it) so discovery never emitted it, it never runs. Remove stale stubs once the event layer exists and give discovery explicit roots for such callbacks.
 
+- **A public test program fails although the model looks right**: check (a) its header SP (0 → give it a stack), (b) reads of the BIOS area (version string at 0x180 → zeros), (c) BIOS `printf`/`puts` (A(3Fh)/A(3Eh)), (d) jump tables the pattern matcher does not know (treat runs of code pointers in data as entries), (e) whether the expected output is from a different build than the binary, (f) uninitialised variables printed or drawn by the test itself.
+
 ## Tooling notes
 Disassemblers can mis-decode COP2 in delay slots and tiny leaf functions without prologues; check raw words. A raw-word scan for `mfc0/mtc0` finds
 data. Keep generated C and every game-derived artefact out of version control.

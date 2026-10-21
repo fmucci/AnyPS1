@@ -21,3 +21,6 @@ output 16×16 pixels (24-bit: 768 bytes, 15-bit: 512 bytes per macroblock). Mono
 Timing; exact hardware behaviour for out-of-range streams (garbage in → garbage out is not verified).
 
 Origin: f2b#0025, 0028.
+
+## A block needs no end-of-block word when it is full (observed)
+A public MDEC test streams one 8×8 block of exactly 64 coefficients (1 DC + 63 AC) with **no** end-of-block word and the hardware decodes it: once the 64th coefficient is stored the block is complete. A decoder that insists on reading one more word waits forever (the program then spins on the MDEC status). Streams that do end with an end-of-block word are unaffected (the word is skipped at the start of the next block).

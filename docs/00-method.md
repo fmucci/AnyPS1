@@ -41,3 +41,6 @@ whole-program smoke test with scripted input.
 
 ## Independent emulator as a behavioural oracle
 When no console/BIOS is available, run the same disc in an independent emulator with a built-in HLE BIOS (headless libretro host: scripted pad, N frames, frame dumps). Add *local* instrumentation (not committed if the emulator's licence forbids derivatives): PC list with registers, DMA/IRQ register writes, BIOS call arguments, RAM-word change poll with the changing PC. Use it to answer "does this sequence complete" and to locate the first divergence in kernel-visible state (an event-table word changing to 0 explained a hang in minutes). Its HLE BIOS is a re-implementation: evidence, not ground truth. Frames it produces are game content: keep them out of version control.
+
+## Public hardware test programs as an oracle
+Capture-based test programs (a program draws or prints, the expected VRAM image or log is shipped with it) can be run through the same recompile-and-link pipeline and compared with the shipped file. It is the cheapest source of hardware-level truth available without a console, as long as the provenance caveat is kept in view; every discrepancy was either a missing hardware rule (06, 09) or a test artefact (uninitialised data, newer binary than the log).

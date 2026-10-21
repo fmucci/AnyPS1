@@ -13,3 +13,4 @@
 - 2026-10-21 · 05: root counter 2 as a sound-sequencer tick (100 Hz, several interrupts per frame); 13: silent game with normal video = missing timer interrupt.
 - 2026-10-22 · 04: pad polled from an F2000003 vblank event callback; 13: input ignored when the callback's registration was stubbed or the callback was never discovered.
 - 2026-10-22 · 02: callbacks discovery cannot see (explicit roots + unresolved-pointer lister); re-audit early stubs.
+- 2026-10-22 · 06: hardware-exact rules from public test programs (plane-gradient interpolation with leftmost-vertex origin, flip, VRAM copy rows, line dither, texture-disable bit, mask bit); 09: full block without end-of-block; 14/16/13/00: provenance caveat, pitfalls, method.

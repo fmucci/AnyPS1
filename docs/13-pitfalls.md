@@ -33,3 +33,5 @@
 ## Tooling notes
 Disassemblers can mis-decode COP2 in delay slots and tiny leaf functions without prologues; check raw words. A raw-word scan for `mfc0/mtc0` finds
 data. Keep generated C and every game-derived artefact out of version control.
+
+- **A fatal strict-check on a tiny access is not a model bug by default** (second title): before widening, find the pc, the pointer origin (null + offset here), what the value is compared against, and whether the reference returns something different; then allow only those addresses (see 04).

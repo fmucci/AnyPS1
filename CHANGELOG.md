@@ -27,3 +27,4 @@
 - 2026-10-22 · 09: MDEC DMA transfers stall (output waits for data, input waits for output to be read).
 - 2026-10-22 · 09: MDEC busy bit gates the strip loop; input transfer busy until output read; DMA interrupts shortly after start.
 - 2026-10-22 · SPU: level register of a freshly keyed voice must not read 0 (voice allocator).
+- 2026-10-22 · 00: scripted route in reference + build with frame sampling comparison (median criterion) and soak/walker-fuzz method; 04: null-pointer low-RAM read policy (allow only observed addresses); 08: multi-disc boot file names; 13: strict-check triage rule.

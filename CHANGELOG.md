@@ -18,3 +18,4 @@
 - 2026-10-22 · 16: section E (other PS1 recompilation projects, licences, what they offer per open question); 06: X-flip `u|1` now documented by a second source.
 - 2026-10-22 · 06: CLUT cache rules (observed on a public test, pixel-identical).
 - 2026-10-22 · 05: DMA channel register rules (OTC control bits, SPU sync-0 start).
+- 2026-10-22 · 10: envelope facts that decide a voice allocator (current-volume polling, key-off resets the rate counter, exponential decrease rounds down).

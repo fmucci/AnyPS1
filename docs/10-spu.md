@@ -28,3 +28,10 @@ Origin: f2b#0011, 0025, 0029.
 
 ## Validation against an independent emulator (observed)
 XA audio of a movie intro: loudness envelope correlation 0.948 (after a constant boot-time shift), waveform correlation 0.938 on an aligned 4000-sample window. The apparent 1.26× gain was the *reference's* default 75 % output volume; with it set to 1.0 the gain is 0.968 and the waveform correlation 0.964 (resampling differences account for the rest). Always check a reference emulator's own output-volume setting before blaming the mixer. Cross-correlate on loud segments (silent windows divide by zero) and re-align per window.
+
+## Envelope details that decide whether a game's voice allocator works (observed)
+- A game can decide that a voice is **free** from the *current ADSR volume* register (voice offset 0Ch) alone: one SDK-style voice manager polls it for all 24 voices every tick and treats a voice as free only after it read 0 for many consecutive polls. An envelope that never reaches exactly 0 therefore makes every voice look busy for ever, the allocator rotates through all 24 voices instead of re-using the first free one, and notes stop cutting each other off (the mix gets several times louder).
+- Two modelling mistakes that cause exactly that, both found by comparing against a public reference emulator:
+  1. **Key-off must reset the envelope rate counter.** A sustain with a very slow rate (shift 31 = about 1M samples per step) leaves the counter running; if key-off only changes the phase, the release waits until the old counter runs out (up to about 23 s). Reference cores reset the step counter at key-off.
+  2. **Exponential decrease must round down.** The step is `step * level >> 15` with an arithmetic shift; truncating towards zero (`/ 0x8000` in C) turns a small negative step into 0 and the level sticks at a few units above 0 for ever. Rounding down gives at least -1 per step, so the level reaches 0.
+- How to detect it in any game: log, per voice, how many of the game's polls read a non-zero level (a good model leaves the high voices almost always at 0 and the low voices busiest) and compare with a reference core's distribution.

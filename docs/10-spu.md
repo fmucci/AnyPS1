@@ -38,3 +38,7 @@ XA audio of a movie intro: loudness envelope correlation 0.948 (after a constant
 
 ## Byte and word reads of SPU registers (observed)
 SDK sound code reads a voice register with a byte load. The 16-bit-wide bus returns the addressed byte of the halfword register; a 32-bit read returns two consecutive registers. Do not abort on these; byte *writes* have not been observed.
+
+## A keyed-on voice must not read level 0 when polled (observed, second title)
+A music driver that allocates voices by reading the **current-volume register of every voice** (0 = free) polls right after it has keyed a voice on. If the model steps the SPU in bulk (per frame) the new voice still reads 0, the allocator reuses or mis-orders voices, more voices stay sustained and the mix is louder (here up to 2x) and decorrelated from a reference. Reference behaviour: the SPU is advanced to the current time before the register is answered, so a voice keyed a few thousand cycles earlier is already above 0. Minimal model: on a level read of a voice that is on, in attack and at level 0, run one envelope step first. Check: compare the number of distinct voices used and the per-frame RMS of the mix with a reference emulator (the ENDX register is not involved).
+

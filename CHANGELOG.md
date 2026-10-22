@@ -25,3 +25,4 @@
 - 2026-10-22 · 17: new doc: controller port (SIO0), pad protocol, three timing rules for polling drivers, kernel interrupt chain walk.
 - 2026-10-22 · 02: unresolved jr is a tail call or a return through a saved register; whole-program interpreter as the reference for bisecting translation bugs.
 - 2026-10-22 · 09: MDEC DMA transfers stall (output waits for data, input waits for output to be read).
+- 2026-10-22 · 09: MDEC busy bit gates the strip loop; input transfer busy until output read; DMA interrupts shortly after start.

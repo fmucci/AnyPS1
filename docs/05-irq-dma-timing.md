@@ -39,3 +39,8 @@ With a virtual frame clock the host decides when a finished frame is shown. **Wa
 ## Documented DMA2 timing data (from the log shipped with a public test; provenance not stated)
 CPU→VRAM DMA of 8192 bytes, CPU cycles (33.8688 MHz), sync mode 1 (block) by block size: 1 → 22819, 2 → 12508, 4 → 7309, 8 → 4790, 16 → 3607, 32 → 2998, 64 → 2662, 128 → 2471 (GPU still busy at the end for the larger sizes); sync mode 0 without chopping → 2196; with chopping windows of 1 word per 1/2/4 CPU clocks → 16693, 20595, 22834. A model with instantaneous DMA reports 0 for all of them. Use as targets if DMA timing is ever modelled; the shape (cost per block shrinks as blocks grow, floor near 2.2k cycles for 8 KiB ≈ 0.27 cycles/byte) is the useful part.
 
+## DMA channel register rules (observed on public self-checking test programs)
+- **OTC (channel 6) CHCR**: only bits 24 (enable/busy), 28 (trigger) and 30 are writable; bit 1 (backwards address step) is hard-wired to 1; all other bits read 0. A write with bit 24 clear stores bits 28/30 and runs nothing; the transfer clears bits 24 and 28 when it completes (a chopping request is ignored).
+- **SPU (channel 4) in sync mode 0 (start immediately)** begins on the enable bit (24) alone — the manual trigger (28) is not needed — and BCR holds the word count; for GPU, CD and MDEC channels the trigger is needed in that mode. (Plausible reason: the SPU request line is always active.)
+- Sync mode 1 transfers to the SPU take time on real hardware (a program measured them and expects code to be able to run between blocks): instantaneous DMA models fail those checks.
+

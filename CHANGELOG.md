@@ -23,3 +23,4 @@
 - 2026-10-22 · 02: discovery on a large monolithic executable (zero-fill runs, delay-slot entries, callbacks built across a jal, covered-body candidates, stub declarations).
 - 2026-10-22 · 05/14: root-counter handling of the BIOS interrupt handler; interpreter tier as the answer for run-time code.
 - 2026-10-22 · 17: new doc: controller port (SIO0), pad protocol, three timing rules for polling drivers, kernel interrupt chain walk.
+- 2026-10-22 · 02: unresolved jr is a tail call or a return through a saved register; whole-program interpreter as the reference for bisecting translation bugs.

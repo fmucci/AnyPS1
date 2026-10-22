@@ -36,6 +36,7 @@ questions that are still open. Every statement is tagged **observed** (with how 
 | [14-open-questions](docs/14-open-questions.md) | what is still unknown on the platform side |
 | [15-sources](docs/15-sources.md) | references and how they were used |
 | [16-documented-sources](docs/16-documented-sources.md) | external specs, hardware tests, open BIOS/SDK and emulator sources, licence rules, which open question each can settle |
+| [17-controller-port](docs/17-controller-port.md) | SIO0 and the digital pad protocol, timing rules for polling drivers, kernel interrupt chains |
 | [CHANGELOG](CHANGELOG.md) | what was added when |
 
 ## How to update

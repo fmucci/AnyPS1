@@ -22,3 +22,4 @@
 - 2026-10-22 · 04/05/08/10: second-title findings (BIOS C library calls, setjmp/kernel-patch routines, deferred DMA completion IRQ, BFRD rewind rule, byte SPU reads, small-integer pointer arguments).
 - 2026-10-22 · 02: discovery on a large monolithic executable (zero-fill runs, delay-slot entries, callbacks built across a jal, covered-body candidates, stub declarations).
 - 2026-10-22 · 05/14: root-counter handling of the BIOS interrupt handler; interpreter tier as the answer for run-time code.
+- 2026-10-22 · 17: new doc: controller port (SIO0), pad protocol, three timing rules for polling drivers, kernel interrupt chain walk.

@@ -35,3 +35,6 @@ XA audio of a movie intro: loudness envelope correlation 0.948 (after a constant
   1. **Key-off must reset the envelope rate counter.** A sustain with a very slow rate (shift 31 = about 1M samples per step) leaves the counter running; if key-off only changes the phase, the release waits until the old counter runs out (up to about 23 s). Reference cores reset the step counter at key-off.
   2. **Exponential decrease must round down.** The step is `step * level >> 15` with an arithmetic shift; truncating towards zero (`/ 0x8000` in C) turns a small negative step into 0 and the level sticks at a few units above 0 for ever. Rounding down gives at least -1 per step, so the level reaches 0.
 - How to detect it in any game: log, per voice, how many of the game's polls read a non-zero level (a good model leaves the high voices almost always at 0 and the low voices busiest) and compare with a reference core's distribution.
+
+## Byte and word reads of SPU registers (observed)
+SDK sound code reads a voice register with a byte load. The 16-bit-wide bus returns the addressed byte of the halfword register; a 32-bit read returns two consecutive registers. Do not abort on these; byte *writes* have not been observed.

@@ -24,3 +24,7 @@ sectors at the real rate or the ring overflows/deadlocks.
 Exact response timings per command, GetlocP details (approximated), multi-session/audio-track discs (only one data track modelled).
 
 Origin: f2b#0004, 0011, 0025, 0029.
+
+## Data FIFO request (BFRD) must not rewind a partly read sector (observed)
+Writing the request register (1F801803h index 0) with bit 7 set loads the sector into the data FIFO **only when the FIFO is empty**; with a partly consumed sector it keeps its read position (a reference emulator does the same, see 16). SDK code that reads a sector in two DMA transfers (12 header+subheader bytes, then 2048 data bytes, with the sector-size bit 5 of the mode set) sets BFRD before each transfer; a model that rewinds on every write hands out the header twice and the driver retries the same sector for ever (symptom: the same Setloc/ReadN/Pause sequence repeating on the primary volume descriptor).
+Related (observed): the sector-size mode bit 5 delivers 2340 bytes starting at the header (12 bytes after the sync), not at the user data.

@@ -20,3 +20,4 @@
 - 2026-10-22 · 05: DMA channel register rules (OTC control bits, SPU sync-0 start).
 - 2026-10-22 · 10: envelope facts that decide a voice allocator (current-volume polling, key-off resets the rate counter, exponential decrease rounds down).
 - 2026-10-22 · 04/05/08/10: second-title findings (BIOS C library calls, setjmp/kernel-patch routines, deferred DMA completion IRQ, BFRD rewind rule, byte SPU reads, small-integer pointer arguments).
+- 2026-10-22 · 02: discovery on a large monolithic executable (zero-fill runs, delay-slot entries, callbacks built across a jal, covered-body candidates, stub declarations).

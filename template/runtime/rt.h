@@ -102,4 +102,11 @@ const uint8_t *rt_hle_card_image(void);
 uint8_t *rt_ram_ptr(Cpu *c);                                  /* host pointer to the 2 MiB guest RAM (HLE modules that DMA into guest memory) */
 const char *rt_hle_stdout(size_t *n);
 void rt_hle_last_exec(uint32_t out[3]);                     /* DoExecute arguments (headerbuf, p1, p2) */
+/* coverage (docs 18): COV(group, id) counts a feature when env PS1_COVERAGE is set; see runtime/cover.c */
+enum { RT_COV_BIOS, RT_COV_GP0, RT_COV_GP1, RT_COV_CD_CMD, RT_COV_DMA, RT_COV_MDEC, RT_COV_SPU_KEYON, RT_COV_IO_R, RT_COV_IO_W, RT_COV_IRQ, RT_COV_SIO, RT_COV_EXC, RT_COV_INTERP, RT_COV_CD_SECTOR, RT_COV_CARD, RT_COV_NGROUPS };
+extern int rt_cov_on;
+void rt_cov(int group, unsigned id);
+void rt_cov_fn(uint32_t a);
+void rt_cov_init(void);
+#define COV(g, id) do { if (rt_cov_on) rt_cov((g), (unsigned)(id)); } while (0)
 #endif

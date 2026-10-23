@@ -66,6 +66,9 @@ extern uint32_t rt_break_pc;                                   /* debug aid: env
 void rt_break_hit(struct Cpu *c);
 void rt_pclog(struct Cpu *c, uint32_t pc);                   /* debug aid: env PS1_PCLOG=addr,addr prints a0-a3/ra/sp every time one of those functions is entered (format of the reference host's --pcs) */
 #define RT_ENTER(a) (rt_ct[rt_cti++ & 4095] = (a), rt_pclog(c, (a)), (void)((a) == rt_break_pc ? (rt_break_hit(c), 0) : 0))
+#elif defined(RT_COVERAGE)
+void rt_cov_fn(uint32_t a);
+#define RT_ENTER(a) rt_cov_fn(a)
 #else
 #define RT_ENTER(a) ((void)0)
 #endif

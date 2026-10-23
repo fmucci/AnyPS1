@@ -135,6 +135,7 @@ static void commit(Cpu *c, Pending *pl, int wrote) { if (pl->reg > 0 && pl->reg 
 
 /* Runs guest code at `target` until it returns to the address that was in $ra on entry. */
 void rt_interp_call(Cpu *c, uint32_t target) {
+    COV(RT_COV_INTERP, 0);
     static int log = -1; if (log < 0) log = getenv("PS1_INTERPLOG") != NULL;
     uint32_t home = c->r[31], pc = target;
     if (log) fprintf(stderr, "[interp] enter %08x (ra %08x, depth %u)\n", target, home, g_depth);

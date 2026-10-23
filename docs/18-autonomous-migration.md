@@ -1,6 +1,6 @@
 # 18 - Goal: a migration an agent can run without a human
 
-Status: **in progress** (written 2026-10-23, after two ports). Done: `template/` (item 1), `PLAYBOOK.md` (2), reference harness scripts (3), route tools (4), `docs/19`. Not done: the dry run on a third game (5), coverage report tool, signature DB beyond two SDK builds. Tags: observed = done in one of the two ports; **planned** = not built yet.
+Status: **in progress** (written 2026-10-23, after two ports). Done: `template/` (item 1), `PLAYBOOK.md` (2), reference harness scripts (3), route tools (4), `docs/19`. Coverage report tool done (`tools/coverage_report.py`, runtime counters `PS1_COVERAGE`, `--coverage` build). Not done: the dry run on a third game (5), signature DB beyond two SDK builds. Tags: observed = done in one of the two ports; **planned** = not built yet.
 
 ## The goal
 A person who knows nothing about emulation gives an agent (Claude Code or similar) this repository and a disc image they own. The agent produces a native build of that game and proves it correct **without the person playing it, answering questions or supplying hardware knowledge**. Everything the two ports needed a human for must therefore become either (a) documented knowledge here, (b) a tool here, or (c) an automated check here.

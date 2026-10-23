@@ -44,7 +44,7 @@ def main():
             roots += sorted({v for v, _, _ in more})
             ents, bodies = funcs.discover(img, hook_addrs, roots)
     patches = {}
-    pf = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "docs", "symbols", os.path.basename(exe) + ".patches.csv")
+    pf = os.path.join(gamecfg.GAME_DIR, "patches", os.path.basename(exe) + ".csv")       # game/patches/<exe>.csv: address,word;word (self-modifying code the translator may assume)
     if os.path.exists(pf):
         for line in open(pf).read().splitlines()[1:]:
             ad, ws = line.split(",")[:2]
@@ -145,6 +145,7 @@ def main():
     lines.append("}")
     os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
     open(out, "w").write("\n".join(lines) + "\n")
+    open(out[:-2] + ".funcs", "w").write("\n".join("%08x" % e for e in sorted(emitted)) + "\n")      # for tools/coverage_report.py
     print("%s: %d functions emitted, %d stubs (not recompiled), %d hooked addresses" % (os.path.basename(exe), len(emitted), len(stubs), len(hook_addrs)))
     for e, why in stubs[:10]:
         print("   stub %08x: %s" % (e, why))

@@ -479,6 +479,7 @@ static void bios_dispatch(Cpu *c, char t, unsigned n) {
     static int bl = -1; if (bl < 0) { bl = getenv("PS1_BIOSLOG") != NULL; if (bl) atexit(bios_summary); }       /* debug aid: the first call of every BIOS function with its arguments, and a call count summary at exit */
     if (bl && n < 256) { g_bios_total[t - 'A'][n]++; if (!g_bios_seen[t - 'A'][n]++) fprintf(stderr, "[bioslog] first %c(%02X) a0-a3 %08x %08x %08x %08x from ra %08x\n", t, n, c->r[4], c->r[5], c->r[6], c->r[7], c->r[31]); }
     { static long from = -2; if (from == -2) from = getenv("PS1_BIOSFROM") ? atol(getenv("PS1_BIOSFROM")) : -1; if (from >= 0 && (long)g_ticks >= from) fprintf(stderr, "[bios] tick %u %c(%02X) a0-a3 %08x %08x %08x %08x ra %08x\n", g_ticks, t, n, c->r[4], c->r[5], c->r[6], c->r[7], c->r[31]); }      /* debug aid: every BIOS call from that virtual frame on */
+    COV(RT_COV_BIOS, (t - 'A') * 256 + n);
     char name[16];
     snprintf(name, sizeof name, "BIOS_%c%02X", t, n);
     rt_trace_hle(c, name);

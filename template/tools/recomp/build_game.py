@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Generate and compile every executable of game/game.json plus the runtime into one program: build/ps1_game (and with --frontend the SDL2 player build/ps1_play).
-usage: python3 -I tools/recomp/build_game.py [-O1] [--frontend] [--calltrace]      then:  build/ps1_game DISC.bin --ticks 3000 --ppm out.ppm
+usage: python3 -I tools/recomp/build_game.py [-O1] [--frontend] [--calltrace]      [--coverage]     then:  build/ps1_game DISC.bin --ticks 3000 --ppm out.ppm
 Writes build/game/game_config.h (names the C side needs: modules to link, boot file names, window title, card file name)."""
 import json
 import os
@@ -44,6 +44,8 @@ def main():
             opt = a
         if a == "--calltrace":
             extra = ["-DRT_CALLTRACE"]
+        if a == "--coverage":                                          # generated functions record their entry: PS1_COVERAGE=file writes the list (tools/coverage_report.py)
+            extra = ["-DRT_COVERAGE"]
     extra = extra + hostenv.extra_flags()
     bd = os.path.join(ROOT, "build", "game")
     os.makedirs(bd, exist_ok=True)

@@ -56,7 +56,7 @@ Do not stop at "it boots". Close each phase with its machine-checkable statement
 
 ## 6. Reach game states without a person: `docs/19-playing-with-guides.md`
 Use the reference emulator's savestates, a public walkthrough read with `WebSearch`/`WebFetch`, picture reading, and `run_game --branch`. Goals, in order: (1) title -> new game -> first controllable screen; (2) first battle; (3) first save point and a save + load round trip; (4) one of each device-heavy scene (movie, XA music, world map if any); (5) random-walker soaks from the save (`tools/route/`), 8 seeds x 400,000 ticks, zero fatals. Write what each reached state needs as a press list in `docs/` of the game repository so it can be replayed.
-Report coverage honestly: list what was **not** exercised.
+Measure coverage: build once with `python3 -I tools/recomp/build_game.py -O1 --coverage` (PS1_GAME_OUT=ps1_game_cov keeps the normal build), run each scenario with `PS1_COVERAGE=run1.json`, then `python3 -I tools/coverage_report.py run*.json --funcs build/game/gen_<prefix>.funcs --md docs/coverage.md`. The report lists device features, CD commands, DMA channels, IRQ sources, BIOS calls and the percentage of recompiled functions entered, and **what was not exercised**: copy that list into the final report.
 
 ## 7. Give back (so the next game is easier)
 Platform facts (not the game's): port them into AnyPS1 `docs/` (observed tag, how to re-check) and add new SDK function signatures to `data/sdk_signatures.csv`. Game-specific facts stay in the game repository.

@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "io.h"
+#include "rt.h"
 
 #define VW 1024
 #define VH 512
@@ -115,7 +116,7 @@ static uint16_t *spu_reg(IoCtx *x, uint32_t off) { return &x->spu_r[(off - 0x1C0
 
 /* ---------------------------------------------------------------- CD-ROM ---- */
 static uint8_t cd_stat(IoCtx *x) { return (uint8_t)((x->cd.motor ? 0x02 : 0) | (x->cd.reading ? 0x20 : 0)); }
-static void cd_irq_raise(IoCtx *x) { if (x->cd.irq_fl & x->cd.irq_en) x->i_stat |= 1u << 2; }
+static void cd_irq_raise(IoCtx *x) { if (x->cd.irq_fl & x->cd.irq_en) { x->i_stat |= 1u << 2; COV(RT_COV_IRQ, 2); } }
 static void cd_queue(IoCtx *x, unsigned delay, int type, const uint8_t *b, int n, int sector) {
     Cd *c = &x->cd;
     if (c->nq == CDQ) return;
@@ -137,6 +138,7 @@ static void cd_read_sector(IoCtx *x) {                  /* load the sector at cu
 
 static void cd_command(IoCtx *x, int cmd) {
     Cd *c = &x->cd;
+    COV(RT_COV_CD_CMD, cmd);
     if (getenv("PS1_CDLOG")) { fprintf(stderr, "[cd] tick %u cmd %02x params", c->tick, cmd); for (int i = 0; i < c->nparam; i++) fprintf(stderr, " %02x", c->param[i]); fprintf(stderr, "  (target %d cur %d mode %02x)\n", c->target, c->cur, c->mode); }
     uint8_t st = cd_stat(x), r[16];
     int np = c->nparam;
@@ -216,6 +218,7 @@ static int cd_fire(IoCtx *x) {
             int deliver = c->sec_valid;
             if (deliver) {
                 uint8_t sm = c->hdr[6];                       /* subheader submode */
+                COV(RT_COV_CD_SECTOR, (sm >> 1) & 7);       /* submode bits 1..3: video / audio / data */
                 int xa = (c->mode & 0x40) && c->hdr[3] == 2 && (sm & 0x44) == 0x44;      /* audio + real-time sector for the ADPCM decoder */
                 if (xa && (!(c->mode & 0x08) || (c->hdr[4] == c->filt_file && c->hdr[5] == c->filt_ch))) { spu_xa_sector(x, c->sec); deliver = 0; }   /* consumed by the XA decoder */
                 else if ((c->mode & 0x08) && (sm & 0x44) == 0x44) deliver = 0;               /* filtered-out audio sector is not delivered as data either */
@@ -401,6 +404,7 @@ static void mdec_write_word(IoCtx *x, uint32_t w) {
     Mdec *m = &x->md;
     if (m->state == 0) {
         unsigned c = w >> 29;
+        COV(RT_COV_MDEC, c);
         m->cmd = w;
         m->status_cmd = (w & 0x1E000000u) | (w & 0xFFFF);
         if (getenv("PS1_MDECLOG")) fprintf(stderr, "[mdec] command word %08x (cmd %u)\n", w, c);
@@ -770,6 +774,7 @@ static void gpulog_note(const char *kind, uint64_t v) {
 static void exec_cmd(IoCtx *x) {
     uint32_t *c = x->cmd;
     unsigned op = c[0] >> 24;
+    COV(RT_COV_GP0, op);
     if (op == 0x02) {                                        /* fill rectangle in VRAM, ignores draw area/mask */
         int fx = c[1] & 0x3F0, fy = (c[1] >> 16) & 0x1FF, w = ((c[2] & 0x3FF) + 0xF) & ~0xF, h = (c[2] >> 16) & 0x1FF;
         uint16_t col = (uint16_t)(((c[0] & 0xF8) >> 3) | ((c[0] & 0xF800) >> 6) | ((c[0] & 0xF80000) >> 9));
@@ -878,6 +883,7 @@ static uint32_t gpuread(IoCtx *x) {
 
 static void gp1_write(IoCtx *x, uint32_t w) {
     unsigned op = w >> 24;
+    COV(RT_COV_GP1, op);
     switch (op) {
     case 0x00:                                               /* reset GPU */
         x->stat_texpage = x->mask_bits = x->disp_bits = 0; x->disp_off = 1; x->dma_dir = 0; x->irq1 = 0;
@@ -915,11 +921,12 @@ static void dicr_update(IoCtx *x, int ch) {
     uint32_t old = x->dicr >> 31;
     uint32_t master = ((x->dicr >> 15) & 1) | (((x->dicr >> 23) & 1) & ((flags & en) != 0));
     x->dicr = (x->dicr & 0x7FFFFFFFu) | (master << 31);
-    if (!old && master) x->i_stat |= 1u << 3;
+    if (!old && master) { x->i_stat |= 1u << 3; COV(RT_COV_IRQ, 3); }
 }
 
 static int dma_start(IoCtx *x, int n) {
     Chan *c = &x->ch[n];
+    COV(RT_COV_DMA, n);
     uint32_t sync = (c->chcr >> 9) & 3, from_ram = c->chcr & 1;
     if (getenv("PS1_DMALOG")) fprintf(stderr, "[dma] start channel %d chcr %08x bcr %08x madr %06x dpcr %08x\n", n, c->chcr, c->bcr, c->madr, x->dpcr);
     if (!((x->dpcr >> (4 * n + 3)) & 1)) return 1;          /* master-disabled: the channel stays busy (CHCR bit 24 set) and runs when DPCR enables it (DuckStation dma.cpp CanTransferChannel; psx-spx DPCR) */
@@ -1010,7 +1017,7 @@ static void timer2_step(IoCtx *x) {
     x->t_pend[2] += (uint32_t)n;
 }
 int io_timer_irq_next(IoCtx *x) {
-    for (int t = 0; t < 3; t++) if (x->t_pend[t]) { x->t_pend[t]--; x->i_stat |= 1u << (4 + t); return t + 1; }
+    for (int t = 0; t < 3; t++) if (x->t_pend[t]) { x->t_pend[t]--; x->i_stat |= 1u << (4 + t); COV(RT_COV_IRQ, 4 + t); return t + 1; }
     return 0;
 }
 uint32_t io_imask(IoCtx *x) { return x->i_mask; }
@@ -1020,7 +1027,7 @@ void io_vblank_tick(IoCtx *x) {
     x->t_sub[0] = x->t_sub[1] = x->t_sub[2] = 0;
     x->t_value[1] = (x->t_value[1] + ((x->disp_bits >> 20) & 1 ? 313 : 263)) & 0xFFFF;
     timer2_step(x);
-    x->i_stat |= 1u;
+    x->i_stat |= 1u; COV(RT_COV_IRQ, 0);
     x->frames++;
     x->cd.tick++;
     if (x->cd.reading && x->cd.tick >= x->cd.next_sector) {          /* data rate: 75 sectors/s (single) or 150 (double speed) = 1.25 or 2.5 sectors per 60 Hz frame, in quarter sectors */
@@ -1052,7 +1059,7 @@ static void sio_commit(IoCtx *x) {                              /* the byte exch
     if (!x->sio.busy) return;
     x->sio.busy = 0;
     if (x->sio.nrx < 8) x->sio.rx[x->sio.nrx++] = x->sio.p_rx;
-    if (x->sio.p_ack && (x->sio.ctrl & 0x1000)) { x->sio.irq_flag = 1; x->i_stat |= 1u << 7; }
+    if (x->sio.p_ack && (x->sio.ctrl & 0x1000)) { x->sio.irq_flag = 1; x->i_stat |= 1u << 7; COV(RT_COV_IRQ, 7); }
 }
 static void sio_exchange(IoCtx *x, uint8_t tx) {
     sio_commit(x);
@@ -1124,6 +1131,7 @@ static uint32_t timer_value(IoCtx *x, int t) {
     return v & 0xFFFF;
 }
 uint32_t io_read(IoCtx *x, uint32_t p, unsigned size, int *ok) {
+    if (rt_cov_on && p >= 0x1F801000 && p < 0x1F803000) rt_cov(RT_COV_IO_R, (p - 0x1F801000) >> 3);
     *ok = 1;
     if (g_io_rd_on < 0) { g_io_rd_on = getenv("PS1_IOHIST") != NULL; if (g_io_rd_on) atexit(io_hist_report); }
     if (g_io_rd_on && p >= 0x1F801000 && p < 0x1F803000) g_io_rd[(p - 0x1F801000) >> 2]++;
@@ -1179,6 +1187,7 @@ uint32_t io_read(IoCtx *x, uint32_t p, unsigned size, int *ok) {
 }
 
 void io_write(IoCtx *x, uint32_t p, unsigned size, uint32_t v, int *ok) {
+    if (rt_cov_on && p >= 0x1F801000 && p < 0x1F803000) rt_cov(RT_COV_IO_W, (p - 0x1F801000) >> 3);
     *ok = 1;
     uint32_t base = p & ~3u;
     if (p >= 0x1F801040 && p < 0x1F801050) { sio_write(x, p, size, v, ok); return; }
@@ -1199,7 +1208,7 @@ void io_write(IoCtx *x, uint32_t p, unsigned size, uint32_t v, int *ok) {
             static int dbg = -1; if (dbg < 0) dbg = getenv("PS1_SPUKON") != NULL;       /* debug aid: one line per key-on with the voice registers (frame, voice, start address, pitch, volume L/R, ADSR) and whether SPUCNT enables the unit */
             if (dbg && getenv("PS1_REFLEV")) { fprintf(stderr, "[ourlev] frame %llu:", (unsigned long long)x->frames); for (int q = 0; q < 24; q++) fprintf(stderr, " %x", x->spu.v[q].level); fprintf(stderr, "\n"); }
             if (dbg) for (int n = 0; n < 24; n++) if (bits >> n & 1) { const uint16_t *r = &x->spu_r[n * 8]; fprintf(stderr, "[kon] frame %llu v%d en=%d vol %04x/%04x pitch %04x start %04x adsr %04x%04x\n", (unsigned long long)x->frames, n, (x->spu_r[(0x1F801DAA - 0x1F801C00) >> 1] >> 15) & 1, r[0], r[1], r[2], r[3], r[5], r[4]); }
-            if (x->spu_r[(0x1F801DAA - 0x1F801C00) >> 1] & 0x8000) for (int n = 0; n < 24; n++) if (bits >> n & 1) spu_keyon(x, n);
+            if (x->spu_r[(0x1F801DAA - 0x1F801C00) >> 1] & 0x8000) for (int n = 0; n < 24; n++) if (bits >> n & 1) { COV(RT_COV_SPU_KEYON, n); spu_keyon(x, n); }
         } else if (p == 0x1F801D8C || p == 0x1F801D8E) {                           /* KOFF */
             uint32_t bits = (uint32_t)(uint16_t)v << (p == 0x1F801D8E ? 16 : 0);
             static int kd = -1; if (kd < 0) kd = getenv("PS1_SPUKON") != NULL;

@@ -24,6 +24,7 @@ typedef struct { uint8_t *ram; uint8_t *scr; int allow_mirrors; LowRange low[8];
 static Mem *M(Cpu *c) { return (Mem *)c->host; }
 
 void rt_init(Cpu *c) {
+    rt_cov_init();
     memset(c, 0, sizeof *c);
     c->yield = RT_YIELD_PERIOD;
     c->cop0[12] = 0x401;   /* SR after BIOS boot: IE=1, IM2=1 (assumption: psx-spx does not state the state at DoExecute) */

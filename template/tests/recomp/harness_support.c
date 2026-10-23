@@ -35,3 +35,5 @@ void gte_cmd(Cpu *c, uint32_t imm25) { c->gte_ncmds++; c->gte_last_cmd = imm25; 
 
 void test_mem_set(const uint8_t *src) { for (unsigned i = 0; i < MEM_SIZE; i++) g_mem[i] = src[i]; }
 const uint8_t *test_mem_get(void) { return g_mem; }
+
+int rt_cov_on; void rt_cov(int g, unsigned id) { (void)g; (void)id; }

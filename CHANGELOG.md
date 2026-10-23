@@ -31,3 +31,4 @@
 - 2026-10-23 · 11: second-title memory card save/load validated against an independent emulator's card (SwCARD events of _card_info, 3-frame _card_load, async read position, device control block table at [0x150]); 04: kernel tables read directly by libraries.
 - 2026-10-23 · 18: plan for an autonomous (agent-run) migration: what replaces each human step, acceptance checks per phase, work list.
 - 2026-10-23 · template/ (game-independent toolchain, instantiated and verified: same frame and tests as the second port), PLAYBOOK.md (agent procedure), 19 (route search with savestates and web walkthroughs), tools: init_game, find_hooks (SDK functions by signature, data/sdk_signatures.csv), setup_ref (reference harness built locally), refbatch/refstep/refwalk, route/ours_session + owalk, run_game --branch.
+- 2026-10-23 · template: coverage counters (PS1_COVERAGE, build --coverage) and tools/coverage_report.py; gen.py writes <out>.funcs; game patches moved to game/patches/.

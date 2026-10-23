@@ -41,6 +41,7 @@ questions that are still open. Every statement is tagged **observed** (with how 
 | [19-playing-with-guides](docs/19-playing-with-guides.md) | an agent reaching game states with a reference emulator's savestates and web walkthroughs |
 | [template/](template/) | the game-independent toolchain (runtime, recompiler, tests, reference harness, player) an agent instantiates for a new game; start with [PLAYBOOK.md](PLAYBOOK.md) |
 | [20-public-programs-selftest](docs/20-public-programs-selftest.md) | 48 standalone programs through the agent flow: what ran, what each gap was, what remains |
+| [21-third-title-dry-run](docs/21-third-title-dry-run.md) | the first port's disc rebuilt from a clean template following only the playbook: friction and fixes |
 | [CHANGELOG](CHANGELOG.md) | what was added when |
 
 ## How to update

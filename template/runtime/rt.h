@@ -12,7 +12,10 @@ typedef void (*RtFatalFn)(const char *msg);
 void rt_set_fatal_handler(RtFatalFn fn);   /* tests install a longjmp; if the handler returns the process still aborts */
 void rt_fatal(const Cpu *c, const char *fmt, ...) __attribute__((noreturn, format(printf, 2, 3)));
 
-#define RT_YIELD_PERIOD 40000      /* taken backward branches per virtual frame; the oracle uses the same number (calibrated against a reference emulator in the ports) */
+#ifndef RT_YIELD_PERIOD
+#define RT_YIELD_PERIOD 40000      /* default; per title: game/game.json "yield_period" (build_game.py passes -DRT_YIELD_PERIOD) */
+#endif
+/* RT_YIELD_PERIOD = taken backward branches per virtual frame: a tuning constant of the title (the two ports needed 4000 and 40000), not a measurement of cycles; the oracle uses the same number */
 void rt_set_max_ticks(unsigned n);   /* test harness: abort (fatal) when more than n virtual frames have passed; 0 = no limit */
 void rt_dma_kick(Cpu *c);        /* a DMA completion interrupt is queued: shortens the current budget so it is delivered soon (runtime/hle.c) */
 void rt_yield(Cpu *c);           /* called by generated code when c->yield reaches 0: advances virtual time and delivers interrupts (runtime/hle.c) */

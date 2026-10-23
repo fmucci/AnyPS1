@@ -125,7 +125,15 @@ class IrqReturn(Exception):
     pass
 
 
-YIELD_PERIOD = 40000     # must equal RT_YIELD_PERIOD in runtime/rt.h (calibrated against a reference emulator in the ports)
+def _yield_period():           # must equal RT_YIELD_PERIOD of the C runtime: the title's game/game.json "yield_period" (default 40000)
+    try:
+        from tools.recomp import gamecfg
+        return int(gamecfg.CFG.get("yield_period", 40000))
+    except (SystemExit, ImportError):
+        return 40000
+
+
+YIELD_PERIOD = _yield_period()
 YIELD_OPS = {"beq", "bne", "blez", "bgtz", "bltz", "bgez", "bc2f", "bc2t", "j"}
 
 

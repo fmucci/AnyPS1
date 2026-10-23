@@ -4,9 +4,10 @@
    "title": "My Game",                     window title of the player
    "disc": "og-files/disc1.bin",           the disc image (MODE2/2352 .bin, cue next to it), relative to the repository root, never committed
    "disc_dir": "og-files/disc",            ISO9660 files extracted from it (tools/iso_extract.py), never committed
-   "exes": [{"file": "SLUS_000.00", "prefix": "main"}],     executables translated ahead of time (prefix = C symbol prefix)
+   "exes": [{"file": "SLUS_000.00", "prefix": "main"}],     executables translated ahead of time (prefix = C symbol prefix); the first is the boot executable, the others are loaded by name through DoExecute (chain titles)
    "boot_names": ["SLUS_000.00"],          boot file names to try on the disc, in order (multi-disc titles name it differently per disc)
-   "overlays": [],                         [{"name": "X", "exr": "X.EXR", "base": "0x80100000", "host_exe": "MAIN.EXE"}] relocatable modules (optional)
+   "overlays": [],                         [{"name": "X", "exr": "X.EXR", "base": "0x80100000", "host_exe": "MAIN.EXE", "relocator": "0x8003cd80", "scratch": "0x801F0000"}] relocatable modules (optional; the relocator is a function of the host executable)
+   "yield_period": 40000,                  taken backward branches per virtual frame (time base): tune per title with tools/calibrate_time.py
    "low_ram": [[lo, hi, "why"]]            extra kernel-area ranges the program is allowed to read (zeros), each with its evidence (optional)}
 Hook / root tables of this game: game/hooks.csv, game/roots.csv (same format as the templates in game/)."""
 import json
@@ -29,7 +30,7 @@ def _load():
             DISC_DIR=os.path.join(ROOT, cfg.get("disc_dir", "og-files/disc")),
             EXES=[(e["file"], e["prefix"]) for e in cfg["exes"]],
             BOOT_NAMES=cfg.get("boot_names") or [cfg["exes"][0]["file"]],
-            OVERLAYS=cfg.get("overlays", []), LOW_RAM=cfg.get("low_ram", []), MAIN_EXE=cfg["exes"][0]["file"])
+            YIELD=int(cfg.get("yield_period", 40000)), OVERLAYS=cfg.get("overlays", []), LOW_RAM=cfg.get("low_ram", []), MAIN_EXE=cfg["exes"][0]["file"])
     return _cache
 
 

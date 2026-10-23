@@ -28,3 +28,4 @@
 - 2026-10-22 · 09: MDEC busy bit gates the strip loop; input transfer busy until output read; DMA interrupts shortly after start.
 - 2026-10-22 · SPU: level register of a freshly keyed voice must not read 0 (voice allocator).
 - 2026-10-22 · 00: scripted route in reference + build with frame sampling comparison (median criterion) and soak/walker-fuzz method; 04: null-pointer low-RAM read policy (allow only observed addresses); 08: multi-disc boot file names; 13: strict-check triage rule.
+- 2026-10-23 · 11: second-title memory card save/load validated against an independent emulator's card (SwCARD events of _card_info, 3-frame _card_load, async read position, device control block table at [0x150]); 04: kernel tables read directly by libraries.

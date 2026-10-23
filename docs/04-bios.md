@@ -46,3 +46,6 @@ A program can poll the pad from an event callback instead of its main loop: `Ope
 
 ## Low-RAM reads through a null pointer inside the BIOS area (observed, second title)
 Overlay code read a byte at [0+0x12B4] (a NULL pointer plus a structure offset) right after a name-entry screen. The reference emulator returns 24 from its own low memory; the real BIOS value is unknown. The value is only compared against a small constant (both 0 and 24 take the same branch). Policy that kept strictness: allow exactly the observed addresses (here 0x12B0..0x12B8) as zero-filled, list them in the stubs table, and keep failing on every other low-RAM access. Do not open the whole first 64 KiB.
+
+## Kernel structures a title reads directly (observed, second title)
+Besides calling the BIOS, an SDK library reads kernel tables in low RAM: the device control block table through `[0x150]`/`[0x154]` (see 11, "Second title"), and kernel areas such as 0x12B4 (above). A HLE BIOS that keeps low RAM empty is enough only until a library walks such a table; treat a call that never happens although the program "should" make it as a sign of an empty table or flag read earlier by the program, and look for loads from addresses below 0x10000 in the instructions just before the missing call.

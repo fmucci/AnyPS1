@@ -40,6 +40,7 @@ questions that are still open. Every statement is tagged **observed** (with how 
 | [18-autonomous-migration](docs/18-autonomous-migration.md) | the goal: a migration run by an agent with no human input; plan and acceptance checks |
 | [19-playing-with-guides](docs/19-playing-with-guides.md) | an agent reaching game states with a reference emulator's savestates and web walkthroughs |
 | [template/](template/) | the game-independent toolchain (runtime, recompiler, tests, reference harness, player) an agent instantiates for a new game; start with [PLAYBOOK.md](PLAYBOOK.md) |
+| [20-public-programs-selftest](docs/20-public-programs-selftest.md) | 48 standalone programs through the agent flow: what ran, what each gap was, what remains |
 | [CHANGELOG](CHANGELOG.md) | what was added when |
 
 ## How to update

@@ -15,3 +15,6 @@ With DTR set on port 1: bytes `01h 42h 00h 00h 00h` are answered `FFh 41h 5Ah <l
 
 ## Kernel interrupt chains
 The BIOS exception handler walks the chains registered with `SysEnqIntRP` (priority 0..3, entry `{+0 next, +4 handler, +8 test}`): call the test function, if it returns non-zero call the handler. An SDK that puts its pad/card poll in such an entry needs this walk; keeping only the queue leaves it dead.
+
+## The BIOS-driven pad buffers (observed, public test programs)
+Programs built with some homebrew SDKs do not talk to SIO0 themselves: they call `B(12h) InitPAD(buf1, len1, buf2, len2)` and `B(13h) StartPAD`, and the BIOS driver rewrites the buffers every vblank. Layout used by the model: byte 0 = status (00h ok, FFh no controller), byte 1 = id (41h digital pad), bytes 2-3 = the two button bytes, active low (first byte: select, L3, R3, start, up, right, down, left; second byte: L2, R2, L1, R1, triangle, circle, cross, square). Port 2 reports no controller. **Inferred** from psx-spx; the real driver also appends more bytes for other pad types.

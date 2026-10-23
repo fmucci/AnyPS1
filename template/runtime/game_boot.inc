@@ -38,6 +38,7 @@ static int game_boot(Cpu *c, const char *disc, const char *card, const char *tra
     }
     c->r[28] = e.gp;
     if (e.sp_base) c->r[29] = c->r[30] = e.sp_base + e.sp_off;
+    else c->r[29] = c->r[30] = 0x801FFF00u;                                              /* header SP 0: the BIOS loader uses the STACK value of SYSTEM.CNF; 801FFF00h is what the titles seen so far name (docs 03) */
     c->r[31] = 0xFFFFFFF0u;
     *entry = e.pc;
     return 0;

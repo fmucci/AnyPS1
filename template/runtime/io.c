@@ -1085,6 +1085,23 @@ int io_sio_irq_next(IoCtx *x) {                                 /* end of the vi
 void io_sio_set_pad(IoCtx *x, uint32_t bios_word) {             /* B(16h) format (active low, byte order reversed) -> controller bytes */
     x->sio.pad = (uint16_t)(((bios_word >> 8) & 0xFF) | ((bios_word & 0xFF) << 8));
 }
+/* Serial port 1 (0x1F801050..5F): the debug UART some SDKs print to. Modelled as a sink: transmitter always ready, nothing received; every transmitted byte goes to the console capture
+ * (io_serial_hook). Mode/control/baud registers are plain storage, accepted at any width. */
+void (*io_serial_hook)(int ch);
+static uint32_t g_sio1[4];
+static uint32_t sio1_read(IoCtx *x, uint32_t p, unsigned size) {
+    (void)x; (void)size;
+    uint32_t reg = (p >> 2) & 3, sh = (p & 3) * 8;
+    uint32_t v = reg == 1 ? 0x5u : g_sio1[reg];                       /* STAT: TX ready (bit 0) and TX idle (bit 2); no RX data */
+    return v >> sh;
+}
+static void sio1_write(IoCtx *x, uint32_t p, unsigned size, uint32_t v) {
+    (void)x;
+    uint32_t reg = (p >> 2) & 3, sh = (p & 3) * 8;
+    if (reg == 0) { if (io_serial_hook) io_serial_hook((int)(v & 0xFF)); return; }
+    uint32_t mask = size >= 4 ? 0xFFFFFFFFu : ((1u << (size * 8)) - 1u) << sh;
+    g_sio1[reg] = (g_sio1[reg] & ~mask) | ((v << sh) & mask);
+}
 static uint32_t sio_read(IoCtx *x, uint32_t p, unsigned size, int *ok) {
     uint32_t reg = p & ~3u, sh = (p & 3) * 8, v = 0;
     if (reg == 0x1F801040) {
@@ -1138,6 +1155,7 @@ uint32_t io_read(IoCtx *x, uint32_t p, unsigned size, int *ok) {
     uint32_t sh = (p & 3) * 8, base = p & ~3u;
     uint32_t v;
     if (p >= 0x1F801040 && p < 0x1F801050) return sio_read(x, p, size, ok);
+    if (p >= 0x1F801050 && p < 0x1F801060) return sio1_read(x, p, size);
     if (base == 0x1F801820) { if (size != 4) { *ok = bad(x, "MDEC data read of %u bytes unproven", size, 0); return 0; } return mdec_read_word(x); }
     if (base == 0x1F801824) { if (size != 4) { *ok = bad(x, "MDEC status read of %u bytes unproven", size, 0); return 0; } return mdec_status(x); }
     if (p >= 0x1F801800 && p <= 0x1F801803) { uint32_t b = cd_read_reg(x, p); return size == 4 ? b * 0x01010101u : b; }
@@ -1150,7 +1168,8 @@ uint32_t io_read(IoCtx *x, uint32_t p, unsigned size, int *ok) {
     else if (base == 0x1F8010F4) v = x->dicr;
     else if (base >= 0x1F801100 && base < 0x1F801130 && (base & 0xF) <= 8) { int t = (base - 0x1F801100) >> 4; unsigned r = (base & 0xF) >> 2; v = r == 0 ? timer_value(x, t) : r == 1 ? x->t_mode[t] : x->t_target[t]; }
     else if (p >= 0x1F801E00 && p < 0x1F801E60) {            /* current voice volume L/R (psx-spx): the model applies volumes at once, so it is the register's effective value */
-        if (size != 2 || (p & 1)) { *ok = bad(x, "SPU read at %08x (%u bytes): only halfword registers are proven used", p, size); return 0; }
+        if (size == 4 && !(p & 3)) { uint32_t lo = io_read(x, p, 2, ok); if (!*ok) return 0; return lo | (io_read(x, p + 2, 2, ok) << 16); }
+        if (size != 2 || (p & 1)) { *ok = bad(x, "SPU read at %08x (%u bytes): only halfword and word registers are proven used", p, size); return 0; }
         int n = (int)(p - 0x1F801E00) >> 2;
         return (uint32_t)(uint16_t)fixvol(x->spu_r[(0x1C00 + 0x10 * n + ((p & 2) ? 2 : 0) - 0x1C00) >> 1]);
     }
@@ -1191,6 +1210,7 @@ void io_write(IoCtx *x, uint32_t p, unsigned size, uint32_t v, int *ok) {
     *ok = 1;
     uint32_t base = p & ~3u;
     if (p >= 0x1F801040 && p < 0x1F801050) { sio_write(x, p, size, v, ok); return; }
+    if (p >= 0x1F801050 && p < 0x1F801060) { sio1_write(x, p, size, v); return; }
     if (base == 0x1F801820 && size == 4) { mdec_write_word(x, v); return; }
     if (base == 0x1F801824 && size == 4) {
         if (v & 0x80000000u) { Mdec *m = &x->md; m->state = 0; m->remain = 0; m->nout = m->outpos = 0; m->status_cmd = 0x00040000u & 0; x->d0_pend = x->d1_pend = x->d0_hold = 0; }      /* reset drops the waiting transfers too */
@@ -1199,7 +1219,8 @@ void io_write(IoCtx *x, uint32_t p, unsigned size, uint32_t v, int *ok) {
     }
     if (p >= 0x1F801800 && p <= 0x1F801803) { if (size != 1) { *ok = bad(x, "CD register write of %u bytes at %08x unproven", size, p); return; } cd_write_reg(x, p, v); return; }
     if (p >= 0x1F801C00 && p < 0x1F801E00) {
-        if (size != 2 || (p & 1)) { *ok = bad(x, "SPU write at %08x (%u bytes): only halfword registers are proven used", p, size); return; }
+        if (size == 4 && !(p & 3)) { io_write(x, p, 2, v & 0xFFFF, ok); if (*ok) io_write(x, p + 2, 2, v >> 16, ok); return; }      /* a word access is two halfword accesses, low half first (psx-spx) */
+        if (size != 2 || (p & 1)) { *ok = bad(x, "SPU write at %08x (%u bytes): only halfword and word registers are proven used", p, size); return; }
         x->spu_r[(p - 0x1F801C00) >> 1] = (uint16_t)v; x->c_spu_w++;
         if (p >= 0x1F801D80) { char k[12]; snprintf(k, sizeof k, "SPU%04x", p & 0xFFFF); gpulog_note(k, (uint16_t)v); }      /* PS1_GPULOG also lists the SPU control/reverb register values */
         else if (p == 0x1F801C04 || p == 0x1F801C06) { /* voice pitch/start: not listed (too many) */ }

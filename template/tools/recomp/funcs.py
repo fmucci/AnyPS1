@@ -50,7 +50,7 @@ class Image:
 
 
 class Body:
-    __slots__ = ("entry", "seen", "calls", "tails", "tables", "bad", "ptr_calls", "hi", "unres", "jal_sites")
+    __slots__ = ("entry", "seen", "calls", "tails", "tables", "bad", "ptr_calls", "hi", "unres", "jal_sites", "traps")
 
 
 def _const_of(img, reg, at, depth=0):
@@ -152,6 +152,7 @@ def descend(img, entry, entries):
     b = Body()
     b.entry, b.seen, b.calls, b.tails, b.tables, b.bad, b.ptr_calls, b.hi, b.unres = entry, set(), set(), set(), {}, [], set(), entry, []
     b.jal_sites = []
+    b.traps = []                         # words reached by fall-through that are not instructions (data after a call that never returns, a deliberate illegal opcode): emitted as a trap, so the function still exists and only fails if that word is EXECUTED
     stack = [entry]
     while stack:
         a = stack.pop()
@@ -171,7 +172,8 @@ def descend(img, entry, entries):
                 zrun = 0
             i = img.ins(a)
             if i.name == "illegal":
-                b.bad.append((a, "illegal word"))
+                b.traps.append(a)
+                b.seen.add(a)
                 break
             b.seen.add(a)
             if not i.is_control:

@@ -50,6 +50,8 @@ Debug aids (env vars): `PS1_BIOSLOG`, `PS1_BIOSFROM=tick` (every BIOS call from 
 | crash in generated code only at -O2 | undefined behaviour in a model | build with `-fsanitize=undefined`, `docs/13` |
 Unknown message: search `docs/` for the exact text first (`grep -rn`), then the reference BIOS source in `work/emu/pcsx_rearmed/libpcsxcore/psxbios.c`, then psx-spx (`docs/16`).
 
+Self-check of a fresh checkout without any commercial disc: `python3 -I tools/selftest_public.py <ps1-tests-bin dir> --ticks 3000` (needs the public `ps1-tests` release under work/refs; `tools/mkdisc.py` wraps any PS-X EXE into a disc). Expect 43 of 48 ok and the 5 documented stops of AnyPS1 `docs/20`.
+
 ## 5. Verify without a human (acceptance, from `docs/18-autonomous-migration.md`)
 Do not stop at "it boots". Close each phase with its machine-checkable statement and write the result in the README progress block:
 1. disc inventory and boot file parse (init_game output) 2. every executable discovered, `unresolved_pointers.py --check` clean 3. `tests/run_all.sh` green (differential tests, mutation check) 4. every BIOS call the executables import is implemented or a registered stub (`tools/scan_psx.py EXE`) 5. public hardware tests pass (`tools/ps1_tests.py`, see `docs/16`) and the game's own traffic matches the reference (frames by pixel match, SPU by envelope correlation) 6. soaks and routes (section 6) with a coverage report 7. save/load round trip with the reference card (docs 11 method) 8. a package builds (`tools/package.py native`).

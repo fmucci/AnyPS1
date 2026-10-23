@@ -151,7 +151,9 @@ int rt_hle_card_save(void) { return card_save(g_card); }
 const uint8_t *rt_hle_card_image(void) { return g_card ? card_image(g_card) : NULL; }
 
 static void ev_reset(void);
+static void serial_out(int ch);
 int rt_hle_init(const char *disc_bin) {
+    io_serial_hook = serial_out;
     ev_reset();
     rt_io_set_disc(disc_bin);
     rt_set_bios_handler(bios_dispatch);
@@ -232,7 +234,20 @@ static void b_pad_init(Cpu *c) {
     c->r[2] = 2;
 }
 static void b_pad_get(Cpu *c) { c->r[2] = PAD_NONE; if (g_pad_dest) store_quiet(c, g_pad_dest, PAD_NONE); }
+static uint32_t g_padbuf[2]; static int g_pad_started;
+static void b_init_pad(Cpu *c) {                     /* B(12h) InitPAD(buf1, len1, buf2, len2): the driver then fills the buffers every vblank (docs 17 / psx-spx) */
+    g_padbuf[0] = c->r[4]; g_padbuf[1] = c->r[6]; c->r[2] = 1;
+}
+static void b_start_pad(Cpu *c) { g_pad_started = 1; c->r[2] = 1; }                          /* B(13h) StartPAD */
+static void pad_buffers_update(Cpu *c) {
+    if (!g_pad_started) return;
+    uint8_t d1[4] = {0x00, 0x41, (uint8_t)(PAD_NONE >> 8), (uint8_t)PAD_NONE}, d2[4] = {0xFF, 0xFF, 0xFF, 0xFF};       /* port 1: digital pad (id 41h), buttons active low; port 2: no controller */
+    if (g_padbuf[0]) rt_mem_write(c, g_padbuf[0], d1, 4);
+    if (g_padbuf[1]) rt_mem_write(c, g_padbuf[1], d2, 4);
+}
 static void b_nop(Cpu *c) { (void)c; }
+static void b_ret1(Cpu *c) { c->r[2] = 1; }
+static void b_getchar(Cpu *c) { c->r[2] = 0x7F; }
 static void b_change_clear_pad(Cpu *c) { g_clear_pad = c->r[4]; }
 static void b_change_clear_rcnt(Cpu *c) {
     uint32_t t = c->r[4];
@@ -314,6 +329,7 @@ void rt_yield(Cpu *c) {
         if (!hit && g_fuzz_on && g_vblanks >= g_fuzz_first) w = fuzz_word();
         PAD_NONE = w;
     }
+    pad_buffers_update(c);
     if (g_pad_dest) store_quiet(c, g_pad_dest, PAD_NONE);      /* pad IRQ handler stores the buttons at [button_dest] (psx-spx B(16h)) */
     io_sio_set_pad(rt_io_ctx(c), PAD_NONE);                    /* the controller port the program's own driver talks to */
     ev_deliver(c, 0xF0000001u, 0x0002u);      /* kernel VBLANK interrupt (psx-spx event class list) */
@@ -401,7 +417,11 @@ static void b_undeliver_event(Cpu *c) {
 static void bios_dispatch_name(Cpu *c, char t, unsigned n, RtFn *f) {
     (void)c;
     *f = NULL;
-    if (t == 'B' && n == 0x15) *f = b_pad_init;
+    if (t == 'A' && n == 0x3B) *f = b_getchar;                               /* getchar: no console input (the reference BIOS answers 7Fh) */
+    else if (t == 'B' && (n == 0x47 || n == 0x48)) *f = b_ret1;                  /* AddDrv / DelDrv: the device list is not modelled beyond the "bu" entry; success */
+    else if (t == 'B' && n == 0x12) *f = b_init_pad;
+    else if (t == 'B' && n == 0x13) *f = b_start_pad;
+    else if (t == 'B' && n == 0x15) *f = b_pad_init;
     else if (t == 'B' && n == 0x16) *f = b_pad_get;
     else if (t == 'B' && n == 0x14) *f = b_nop;
     else if (t == 'B' && n == 0x5B) *f = b_change_clear_pad;
@@ -430,6 +450,7 @@ static void h_init_heap_bios(Cpu *c) { (void)c; }
 /* BIOS A(3Ch) putchar, A(3Eh) puts, A(3Fh) printf: appended to the captured console output (psx-spx "Kernel Standard Functions"; the C runtime only, no game executable uses them).
  * printf supports %d %i %u %x %X %c %s %p %% with flags -/0, width and the l/h modifiers; the arguments are a1..a3 and then the stack words from sp+16. */
 static void out_ch(char ch) { if (g_outn < sizeof g_out) g_out[g_outn++] = ch; }
+static void serial_out(int ch) { out_ch((char)ch); }          /* serial port 1 transmit = console capture */
 static void h_stdio(Cpu *c, unsigned n) {
     if (n == 0x3C) { out_ch((char)c->r[4]); c->r[2] = c->r[4] & 0xFF; return; }
     uint32_t p = c->r[4];
@@ -476,6 +497,7 @@ static void h_stdio(Cpu *c, unsigned n) {
 static unsigned g_bios_seen[3][256], g_bios_total[3][256];
 static void bios_summary(void) { fprintf(stderr, "[bioslog] calls:"); for (int t = 0; t < 3; t++) for (int n = 0; n < 256; n++) if (g_bios_total[t][n]) fprintf(stderr, " %c(%02X)x%u", 'A' + t, n, g_bios_total[t][n]); fprintf(stderr, "\n"); }
 static void bios_dispatch(Cpu *c, char t, unsigned n) {
+    if (t == 'A' && n <= 5) { t = 'B'; n += 0x32; }              /* A(00h..05h) FileOpen/Seek/Read/Write/Close/Ioctl are the same functions as B(32h..37h) (psx-spx) */
     static int bl = -1; if (bl < 0) { bl = getenv("PS1_BIOSLOG") != NULL; if (bl) atexit(bios_summary); }       /* debug aid: the first call of every BIOS function with its arguments, and a call count summary at exit */
     if (bl && n < 256) { g_bios_total[t - 'A'][n]++; if (!g_bios_seen[t - 'A'][n]++) fprintf(stderr, "[bioslog] first %c(%02X) a0-a3 %08x %08x %08x %08x from ra %08x\n", t, n, c->r[4], c->r[5], c->r[6], c->r[7], c->r[31]); }
     { static long from = -2; if (from == -2) from = getenv("PS1_BIOSFROM") ? atol(getenv("PS1_BIOSFROM")) : -1; if (from >= 0 && (long)g_ticks >= from) fprintf(stderr, "[bios] tick %u %c(%02X) a0-a3 %08x %08x %08x %08x ra %08x\n", g_ticks, t, n, c->r[4], c->r[5], c->r[6], c->r[7], c->r[31]); }      /* debug aid: every BIOS call from that virtual frame on */

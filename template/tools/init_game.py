@@ -95,6 +95,8 @@ def main():
     p = os.path.join(ROOT, "game", "game.json")
     if os.path.exists(p):
         old = json.load(open(p))
+        if boot not in old.get("boot_names", []) and boot != old.get("exes", [{}])[0].get("file"):
+            old = {}                                                          # another game: start from scratch
         cfg.update({k: old[k] for k in ("exes", "boot_names", "overlays", "low_ram") if k in old})        # keep what was learned about this game
     json.dump(cfg, open(p, "w"), indent=2)
     for fn, head in (("hooks.csv", "exe,address,name,param,param2,masked_signature_sha256_prefix\n"), ("roots.csv", "exe,address,evidence\n")):

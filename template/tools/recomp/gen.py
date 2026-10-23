@@ -11,7 +11,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
-from tools.recomp import emit, funcs, hooks  # noqa: E402
+from tools.recomp import emit, funcs, hooks, isa  # noqa: E402
 from tools.recomp import gamecfg  # noqa: E402
 
 
@@ -69,6 +69,9 @@ def main():
             continue
         lo, hi = min(b.seen), b.hi
         words = [img.w(x) for x in range(lo, hi, 4)]
+        for k, w in enumerate(words):                                  # a word that is not an instruction (data inside the span, or a path that falls into data): `break 0xFFFFF`; executing it stops the run with a fatal naming the address, it never silently continues
+            if isa.decode(w, lo + 4 * k).name == "illegal":
+                words[k] = 0x0000000D | (0xFFFFF << 6)
         tables = {site: t[1] for site, t in b.tables.items()}
         try:
             src, rep = emit.emit_fragment(words, lo, emit.fn_name(e), fn={"known": {k & 0x1FFFFFFF for k in known}, "tables": tables, "entry": e, "patches": patches})

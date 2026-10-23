@@ -54,6 +54,7 @@ void rt_exception(Cpu *c, uint32_t pc, uint32_t code, uint32_t arg) {
 /* COP0: only SR(12), Cause(13) read, EPC(14) are accepted; the scan of the executables cannot tell which registers are really
  * used (it also matches data words), so every other register aborts until a trace proves it (finding 0018). */
 uint32_t cop0_mfc0(Cpu *c, unsigned n) {
+    if (n == 15) return 2;                                           /* PRId: R3000A revision 2 (psx-spx) */
     if (n != 12 && n != 13 && n != 14) rt_fatal(c, "mfc0 of unproven COP0 register %u", n);
     return c->cop0[n];
 }

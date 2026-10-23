@@ -36,7 +36,7 @@ def load_io_lib():
     src = [os.path.join(_ROOT, "runtime", "io.c"), os.path.join(_ROOT, "runtime", "io.h"), os.path.join(_ROOT, "runtime", "gte.c"), os.path.join(_ROOT, "runtime", "gte.h"), os.path.join(_ROOT, "runtime", "card.c"), os.path.join(_ROOT, "runtime", "card.h")]
     if not os.path.exists(out) or os.path.getmtime(out) < max(os.path.getmtime(p) for p in src):
         os.makedirs(os.path.dirname(out), exist_ok=True)
-        subprocess.run([hostenv.CC, "-std=gnu11", "-O1", "-shared", "-fPIC", "-I", os.path.join(_ROOT, "runtime"), src[0], src[2], src[4], "-o", out], check=True)
+        subprocess.run([hostenv.CC, "-std=gnu11", "-O1", "-shared", "-fPIC", "-I", os.path.join(_ROOT, "runtime"), src[0], src[2], src[4], os.path.join(_ROOT, "runtime", "cov_stub.c"), "-o", out], check=True)
     lib = ctypes.CDLL(out)
     lib.io_new.restype = ctypes.c_void_p
     lib.io_new.argtypes = [ctypes.c_void_p]

@@ -56,7 +56,6 @@ int main(int argc, char **argv) {
     static uint8_t buf[0x200000];
     rt_mem_read(c, 0x80010000, buf, 0x1F0000);
     h = fnv(h, buf, 0x1F0000);
-    if (low) { rt_mem_read(c, 0x80009000, buf, 0x1000); h = fnv(h, buf, 0x1000); }
     if (getenv("PS1_PPM")) io_dump_ppm(rt_io_ctx(c), getenv("PS1_PPM"), 0, 0, 1024, 512);
     printf("hw %016llx\n", (unsigned long long)io_state_hash(rt_io_ctx(c)));
     if (getenv("PS1_CARD")) rt_hle_card_save();

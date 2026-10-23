@@ -49,3 +49,6 @@ Overlay code read a byte at [0+0x12B4] (a NULL pointer plus a structure offset) 
 
 ## Kernel structures a title reads directly (observed, second title)
 Besides calling the BIOS, an SDK library reads kernel tables in low RAM: the device control block table through `[0x150]`/`[0x154]` (see 11, "Second title"), and kernel areas such as 0x12B4 (above). A HLE BIOS that keeps low RAM empty is enough only until a library walks such a table; treat a call that never happens although the program "should" make it as a sign of an empty table or flag read earlier by the program, and look for loads from addresses below 0x10000 in the instructions just before the missing call.
+
+## Small BIOS surface added by the public-program test (observed to be needed, docs 20)
+`A(00h..05h)` are the same functions as `B(32h..37h)` (file open/seek/read/write/close/ioctl); `B(47h)`/`B(48h)` AddDrv/DelDrv (success), `A(3Bh)` getchar (the reference BIOS answers 7Fh when there is no input), `B(12h)`/`B(13h)` InitPAD/StartPAD (docs 17). Header SP = 0: the BIOS loader supplies the SYSTEM.CNF stack (801FFF00h in every title seen). COP0 register 15 (PRId) reads 2. Serial port 1 (1F801050h..5Fh) is a debug UART: modelled as a console sink.

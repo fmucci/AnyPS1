@@ -55,6 +55,7 @@ static void branch_hook(Cpu *c, void *ud) {                /* --branch TICK:FILE
             snprintf(pre, sizeof pre, "%s", tok); g_every_prefix = pre;
             snprintf(log, sizeof log, "%slog.txt", tok); if (!freopen(log, "w", stdout)) _exit(3); dup2(fileno(stdout), 2);
             snprintf(cardp, sizeof cardp, "%scard.mcr", tok); rt_hle_card_set_path(cardp);
+            if (getenv("PS1_COVERAGE") || getenv("FF9_COVERAGE")) { static char covp[700]; snprintf(covp, sizeof covp, "%scov.json", tok); setenv("PS1_COVERAGE", covp, 1); }      /* each branch writes its own coverage file */
             static char *pr[4096]; int np = 0;                  /* tokenise first: rt_pad_script_add uses strtok itself */
             while (np < 4096 && (tok = strtok(NULL, " \t\r\n"))) pr[np++] = tok;
             for (int k = 0; k < np; k++) rt_pad_script_add(pr[k]);

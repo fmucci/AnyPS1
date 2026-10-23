@@ -7,6 +7,7 @@ Everything that replaces real code or is a guess, with its evidence. Kept in syn
 | (add one row per title-specific stub: the hook table row, the low-RAM range, ... with its evidence) | | |
 | hook `Null` | SDK routines that patch the BIOS in RAM (table lookups, exception-handler words) | nothing to patch in a HLE BIOS; audit each routine before binding (docs 04 of AnyPS1) |
 | hooks `EnterCriticalSection`, `ExitCriticalSection` | `syscall` wrappers | single-threaded port, interrupts masked through COP0 SR |
+| BIOS `A(A1h)` SystemErrorBootOrDiskFailure, `B(38h)` exit | imported by SDK start-up / error paths | error paths of the SDK: intentionally NOT implemented; the runtime stops with `BIOS X(NN) is not implemented` if a run ever calls them (the coverage report shows whether it did) |
 | BIOS C library: `strcmp`, `strncmp`, `bcopy`, `bzero`, `SetJmp`, `printf`, memchr/memcpy/memset/strcpy/strcat/strlen/rand/srand | `tools/recomp/biosc.py`, `runtime/biosc.inc` | contracts from psx-spx; return values the documentation does not give are inferred (docs 04) |
 
 ## BIOS calls and hardware placeholders carried over from the first two ports (platform level; same contracts)

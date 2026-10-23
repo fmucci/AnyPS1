@@ -34,3 +34,4 @@
 - 2026-10-23 · template: coverage counters (PS1_COVERAGE, build --coverage) and tools/coverage_report.py; gen.py writes <out>.funcs; game patches moved to game/patches/.
 - 2026-10-23 · 20: 48 public test programs through mkdisc -> init_game -> build -> run (43 ok, 5 documented gaps); template fixes found that way: default SP, InitPAD/StartPAD, serial port 1 sink, A(00..05) file aliases, AddDrv/DelDrv/getchar, PRId, 32-bit SPU access, illegal words as traps; new tools mkdisc.py, selftest_public.py; coverage counters.
 - 2026-10-23 · 21: dry run on the first port's disc from a clean template (frame identical at tick 12000); template: per-title yield_period + tools/calibrate_time.py, chain modules (exes[1:] via rt_hle_add_module), parametrised exr.py; triage rows for stack-in-kernel-area, chain modules, CD timeouts.
+- 2026-10-23 · template: tools/bios_imports_check.py (acceptance check 4: imported BIOS calls vs implemented/registered), stub rows for A(A1h)/B(38h).

@@ -37,6 +37,7 @@ questions that are still open. Every statement is tagged **observed** (with how 
 | [15-sources](docs/15-sources.md) | references and how they were used |
 | [16-documented-sources](docs/16-documented-sources.md) | external specs, hardware tests, open BIOS/SDK and emulator sources, licence rules, which open question each can settle |
 | [17-controller-port](docs/17-controller-port.md) | SIO0 and the digital pad protocol, timing rules for polling drivers, kernel interrupt chains |
+| [18-autonomous-migration](docs/18-autonomous-migration.md) | the goal: a migration run by an agent with no human input; plan and acceptance checks |
 | [CHANGELOG](CHANGELOG.md) | what was added when |
 
 ## How to update

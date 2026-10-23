@@ -1,0 +1,17 @@
+name,param,param2,masked_signature_sha256_prefix,seen_in
+EnterCriticalSection,0x0,0x0,599e45ab702ce00a,title A
+EnterCriticalSection,0x0,0x0,804f6c73bfea2990,title B
+EnterCriticalSection,0x0,0x0,8c18846ebc05077f,title B
+EnterCriticalSection,0x0,0x0,bd5fc871a0cbc49f,title B
+ExitCriticalSection,0x0,0x0,1477875458de2c7e,title B
+ExitCriticalSection,0x0,0x0,45e432ab160e4620,title B
+ExitCriticalSection,0x0,0x0,7ade42e4983bf60d,title B
+ExitCriticalSection,0x0,0x0,c1cd5f8a5f339fb9,title A
+ExitCriticalSection,0x0,0x0,f3c00637462f9a0d,title B
+ExitCriticalSection,0x0,0x0,fd990dcb78d27ff6,title B
+Null,0x0,0x0,072db4e521cb9655,title A
+Null,0x0,0x0,11c6d20daa1643f2,title B
+Null,0x0,0x0,376fe59e6633a166,title A
+Null,0x0,0x0,60ad0820ae3dc81f,title A
+Null,0x0,0x0,af22dfc632ee48be,title A
+Null,0x0,0x0,e149a018740ed92e,title A

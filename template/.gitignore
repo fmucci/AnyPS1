@@ -1,0 +1,18 @@
+# Original / copyrighted game data and everything derived from it. NEVER commit.
+/og-files/
+/work/
+*.bin
+*.cue
+*.rar
+*.exe
+*.exr
+*.elf
+# editor / OS
+.DS_Store
+__pycache__/
+*.pyc
+__pycache__/
+/build/
+/dist/
+*.zip
+*.7z

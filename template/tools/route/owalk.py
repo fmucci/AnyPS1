@@ -11,6 +11,6 @@ for sd in seeds.split(","):
         if r.random()<wdir:
             d=r.choice(wset.split(",")); l=r.randint(60,220); ps.append("%s@%d-%d"%(d,t,t+l)); t+=l+5
         else:
-            ps.append("cross@%d-%d"%(t,t+8)); t+=40
+            ps.append("%s@%d-%d"%("circle" if r.random()<0.12 else "cross",t,t+8)); t+=40     # Cross confirms / talks, Circle cancels (a walker that never cancels stays in a menu for ever)
     L.append("%s/w%s_:%d:%d %s"%(os.path.abspath(out),sd,t0,step," ".join(ps)))
 open(out+"/branches.txt","w").write("\n".join(L)+"\n")

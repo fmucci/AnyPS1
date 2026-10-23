@@ -1,8 +1,9 @@
 # AnyPS1
 
-A knowledge base for **static recompilation of PlayStation 1 software**, written in the spirit of
+A knowledge base **and a ready-to-instantiate toolchain** for **static recompilation of PlayStation 1 software**, written in the spirit of
 [AnyPS5](https://github.com/boykopovar/AnyPS5): everything that was learned about the *platform* (CPU, BIOS, hardware, SDK conventions,
-tooling method) while porting one commercial title, with **nothing that belongs to the title**.
+tooling method) while porting two commercial titles, with **nothing that belongs to a title**. `docs/` is the knowledge, `template/` the generic recompiler/runtime/tests/tools
+(verified on both titles and on 48 public test programs), `PLAYBOOK.md` the procedure an AI agent follows to migrate a new game without a human (goal: docs/18).
 
 ## Use it with an AI agent (for someone who knows nothing about emulation)
 Give your agent (Claude Code or similar) this repository's folder and your game disc (a raw `.bin/.cue`, or an archive holding it), then paste:
@@ -18,7 +19,7 @@ questions that are still open. Every statement is tagged **observed** (with how 
 
 ## What is deliberately not in here
 - No game data, binaries, disc contents, screenshots, VRAM/audio dumps, file names or directory listings of any title.
-- No game addresses, symbol names, strings or structure layouts (addresses that appear are hardware registers or documented BIOS vectors).
+- No game addresses, symbol names, strings or structure layouts (addresses that appear are hardware registers or documented BIOS vectors). `template/data/sdk_signatures.csv` holds hashes of masked instruction words of SDK library functions, not addresses.
 - No third-party source code. Reference emulators were only *read* to check behaviour; what is written here is our own description.
   (DuckStation's licence forbids derivatives; psx-spx is the primary public documentation and is cited, not copied.)
 

@@ -2,8 +2,10 @@
  * usage: run_game DISC.bin [--ticks N] [--press button[+button]@first-last]... [--fuzz SEED:FIRST_FRAME] [--replay FILE] [--ppm FILE] [--audio RAW.s16] [--trace FILE] [--card FILE] [--branch TICK:FILE]
  * Build: python3 -I tools/recomp/build_game.py */
 #include <setjmp.h>
+#ifndef _WIN32
 #include <sys/wait.h>
 #include <unistd.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -32,6 +34,9 @@ static void every_hook(Cpu *c, void *ud) {                 /* --ppm-every PREFIX
     free(rgb);
 }
 static struct { unsigned tick; const char *file; } g_br[8]; static unsigned g_nbr;       /* --branch may be given several times; a child keeps the later ones, so a run can fork again from any of its children */
+#ifdef _WIN32
+static void branch_hook(Cpu *c, void *ud) { (void)c; (void)ud; fprintf(stderr, "--branch needs fork(): not available on Windows\n"); exit(2); }
+#else
 static void branch_hook(Cpu *c, void *ud) {                /* --branch TICK:FILE forks the whole run at that tick: one child per line of FILE, `PREFIX[:FIRST:STEP] press press ...` (PREFIX replaces the --ppm-every prefix and names the child's log and card), so a route can be explored from an in-memory checkpoint */
     (void)c; (void)ud;
     unsigned bi; for (bi = 0; bi < g_nbr; bi++) if (g_br[bi].file && g_br[bi].tick == rt_hle_ticks()) break;
@@ -62,6 +67,7 @@ static void branch_hook(Cpu *c, void *ud) {                /* --branch TICK:FILE
     int st; while (kids-- > 0) wait(&st);
     fflush(NULL); _exit(0);                                  /* the parent only waits */
 }
+#endif
 static jmp_buf g_jb;
 static char g_msg[700];
 static void on_fatal(const char *m) { snprintf(g_msg, sizeof g_msg, "%s", m); longjmp(g_jb, 1); }

@@ -17,6 +17,7 @@ void io_irq_ack(IoCtx *x, uint32_t bits);           /* clears bits of I_STAT (wh
 int io_sio_irq_next(IoCtx *x);                    /* raises the next queued SIO0 ACK interrupt (I_STAT bit 7); returns 1 if one was raised */
 void io_sio_set_pad(IoCtx *x, uint32_t bios_word);   /* current pad-1 buttons in the B(16h) format (active low) */
 extern void (*io_serial_hook)(int ch);             /* receives every byte written to serial port 1 (set by the HLE layer: console capture) */
+int io_cd_reopen(IoCtx *x);                       /* reopen the disc image (own file offset): after fork() */
 int io_dma_pending(const IoCtx *x);                /* nonzero while a DMA-completion interrupt is queued */
 int io_dma_irq_next(IoCtx *x);                    /* raises the next queued DMA-completion interrupt (DICR flag, I_STAT bit 3); returns 1 if I_STAT changed */
 int io_cd_step(IoCtx *x);                           /* fires at most one pending CD interrupt (extra interrupts within a frame); returns 1 if one fired */

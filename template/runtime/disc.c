@@ -4,7 +4,7 @@
 #include <string.h>
 #include "disc.h"
 
-struct RtDisc { FILE *f; uint32_t root_lba, root_size; };
+struct RtDisc { FILE *f; char path[1024]; uint32_t root_lba, root_size; };
 #define FRAME 2352
 #define HDR 24
 
@@ -22,6 +22,7 @@ int rt_disc_read(RtDisc *d, uint32_t lba, uint32_t n, uint8_t *dst) {
 RtDisc *rt_disc_open(const char *path) {
     RtDisc *d = calloc(1, sizeof *d);
     if (!d) return NULL;
+    snprintf(d->path, sizeof d->path, "%s", path);
     d->f = fopen(path, "rb");
     uint8_t pvd[2048];
     if (!d->f || !rt_disc_read(d, 16, 1, pvd) || memcmp(pvd + 1, "CD001", 5) != 0) { rt_disc_close(d); return NULL; }
@@ -29,6 +30,7 @@ RtDisc *rt_disc_open(const char *path) {
     d->root_size = le32(pvd + 156 + 10);
     return d;
 }
+void rt_disc_reopen(RtDisc *d) { if (d && d->f) { fclose(d->f); d->f = fopen(d->path, "rb"); } }
 void rt_disc_close(RtDisc *d) { if (d) { if (d->f) fclose(d->f); free(d); } }
 
 static int upper_eq(const char *a, size_t na, const char *b, size_t nb) {

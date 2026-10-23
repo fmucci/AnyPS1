@@ -38,7 +38,7 @@ static struct { unsigned tick; const char *file; } g_br[8]; static unsigned g_nb
 static void branch_hook(Cpu *c, void *ud) { (void)c; (void)ud; fprintf(stderr, "--branch needs fork(): not available on Windows\n"); exit(2); }
 #else
 static void branch_hook(Cpu *c, void *ud) {                /* --branch TICK:FILE forks the whole run at that tick: one child per line of FILE, `PREFIX[:FIRST:STEP] press press ...` (PREFIX replaces the --ppm-every prefix and names the child's log and card), so a route can be explored from an in-memory checkpoint */
-    (void)c; (void)ud;
+    (void)ud;
     unsigned bi; for (bi = 0; bi < g_nbr; bi++) if (g_br[bi].file && g_br[bi].tick == rt_hle_ticks()) break;
     if (bi == g_nbr) return;
     FILE *bf = fopen(g_br[bi].file, "r"); static char line[1 << 16]; int kids = 0;
@@ -55,6 +55,7 @@ static void branch_hook(Cpu *c, void *ud) {                /* --branch TICK:FILE
             snprintf(pre, sizeof pre, "%s", tok); g_every_prefix = pre;
             snprintf(log, sizeof log, "%slog.txt", tok); if (!freopen(log, "w", stdout)) _exit(3); dup2(fileno(stdout), 2);
             snprintf(cardp, sizeof cardp, "%scard.mcr", tok); rt_hle_card_set_path(cardp);
+            rt_hle_reopen_files(c);                             /* siblings must not share the disc file offset (reads would interleave and corrupt each other) */
             if (getenv("PS1_COVERAGE") || getenv("FF9_COVERAGE")) { static char covp[700]; snprintf(covp, sizeof covp, "%scov.json", tok); setenv("PS1_COVERAGE", covp, 1); }      /* each branch writes its own coverage file */
             static char *pr[4096]; int np = 0;                  /* tokenise first: rt_pad_script_add uses strtok itself */
             while (np < 4096 && (tok = strtok(NULL, " \t\r\n"))) pr[np++] = tok;

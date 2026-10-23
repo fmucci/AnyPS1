@@ -35,6 +35,7 @@ Some bugs only show in game states you cannot reach with a title-screen smoke te
 - `rt_pad_script_add`-style parsers that use `strtok` break a caller's own tokenising: tokenise first.
 - Every guide step that changes screen is a *transition* (fade, load): do not read the picture during it; read 100-200 frames later.
 - Random walking in the reference finds areas, but its press list is only valid from that state: keep the end states, not just the lists.
+- **Forked branches must not share the disc file offset**: children of `run_game --branch` inherit the open disc file description; stdio reads in sibling processes then interleave on one offset and corrupt each other (symptom: some branches stay on a black screen at the title overlay, different ones on each run). The runtime reopens the disc files in every child (`rt_hle_reopen_files`); any new open file a model keeps must do the same.
 - Treat a guide as **documented**, not observed: the game here is a specific release; names/steps can differ.
 
 ## What this replaces and what it does not

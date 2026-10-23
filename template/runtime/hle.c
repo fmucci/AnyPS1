@@ -145,6 +145,7 @@ static const struct { const char *n; RtFn f; } HOOKS[] = {
     {"CdSearchFile", h_cd_search_file}, {"Null", h_null}, {"VSync", h_vsync}, {"CdControl", h_cd_control}, {"CdSync", h_cd_sync}, {"EnterCriticalSection", h_enter_critical}, {"ExitCriticalSection", h_exit_critical},
 };
 
+void rt_hle_reopen_files(Cpu *c) { rt_disc_reopen(g_disc); io_cd_reopen(rt_io_ctx(c)); }       /* children of run_game --branch: own file offsets for the disc */
 void rt_hle_set_card(const char *path) { g_card = card_new(path); }
 void rt_hle_card_set_path(const char *path) { card_set_path(g_card, path); }
 int rt_hle_card_save(void) { return card_save(g_card); }

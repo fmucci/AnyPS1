@@ -19,7 +19,7 @@ typedef struct {
 #define CDQ 16
 typedef struct { unsigned due; int type; int n; uint8_t b[16]; int sector; } CdEv;
 typedef struct {
-    FILE *f;
+    FILE *f; char path[1024];
     int index, irq_en, irq_fl, mode, motor, reading, filt_file, filt_ch, adpmute;
     uint8_t param[16]; int nparam;
     uint8_t resp[16]; int nresp, presp;
@@ -245,7 +245,8 @@ static int cd_fire(IoCtx *x) {
     return 1;
 }
 
-int io_cd_open(IoCtx *x, const char *path) { x->cd.f = fopen(path, "rb"); return x->cd.f != NULL; }
+int io_cd_open(IoCtx *x, const char *path) { snprintf(x->cd.path, sizeof x->cd.path, "%s", path); x->cd.f = fopen(path, "rb"); return x->cd.f != NULL; }
+int io_cd_reopen(IoCtx *x) { if (x->cd.f) fclose(x->cd.f); x->cd.f = fopen(x->cd.path, "rb"); return x->cd.f != NULL; }      /* a forked child must not share the open file description (and offset) of its siblings */
 static void dicr_update(IoCtx *x, int ch);
 int io_cd_step(IoCtx *x) { return cd_fire(x); }
 /* DMA completion interrupts: a transfer is instantaneous in this model, but its interrupt must not be visible inside the interrupt handler that started it (a handler that restarts the

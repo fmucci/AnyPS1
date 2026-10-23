@@ -111,5 +111,6 @@ extern int rt_cov_on;
 void rt_cov(int group, unsigned id);
 void rt_cov_fn(uint32_t a);
 void rt_cov_init(void);
+void rt_hle_reopen_files(Cpu *c);                        /* after fork(): reopen the disc image files so siblings do not share a file offset */
 #define COV(g, id) do { if (rt_cov_on) rt_cov((g), (unsigned)(id)); } while (0)
 #endif

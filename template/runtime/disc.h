@@ -3,6 +3,7 @@
 #define PS1_DISC_H
 #include <stdint.h>
 typedef struct RtDisc RtDisc;
+void rt_disc_reopen(RtDisc *d);                      /* reopen with its own file offset (after fork()) */
 RtDisc *rt_disc_open(const char *bin_path);          /* NULL if the file cannot be opened or has no ISO 9660 descriptor */
 void rt_disc_close(RtDisc *d);
 /* path like "\\INTRO.EXE;1" (case-insensitive, version optional); returns 1 and fills lba/size/name (NUL-terminated, max 31 chars) or 0 */

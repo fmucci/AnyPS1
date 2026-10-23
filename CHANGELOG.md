@@ -36,3 +36,4 @@
 - 2026-10-23 · 21: dry run on the first port's disc from a clean template (frame identical at tick 12000); template: per-title yield_period + tools/calibrate_time.py, chain modules (exes[1:] via rt_hle_add_module), parametrised exr.py; triage rows for stack-in-kernel-area, chain modules, CD timeouts.
 - 2026-10-23 · template: tools/bios_imports_check.py (acceptance check 4: imported BIOS calls vs implemented/registered), stub rows for A(A1h)/B(38h).
 - 2026-10-23 · template: run_game --branch guarded for Windows (no fork); Windows package of the second port built from a clean instance with docker/windows (acceptance check 8).
+- 2026-10-23 · template/19: forked --branch children reopen the disc files (shared file offset corrupted sibling reads); per-branch coverage file.

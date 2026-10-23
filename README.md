@@ -4,6 +4,12 @@ A knowledge base for **static recompilation of PlayStation 1 software**, written
 [AnyPS5](https://github.com/boykopovar/AnyPS5): everything that was learned about the *platform* (CPU, BIOS, hardware, SDK conventions,
 tooling method) while porting one commercial title, with **nothing that belongs to the title**.
 
+## Use it with an AI agent (for someone who knows nothing about emulation)
+Give your agent (Claude Code or similar) this repository's folder and your game disc (a raw `.bin/.cue`, or an archive holding it), then paste:
+> Read PLAYBOOK.md in the AnyPS1 folder and follow it exactly to migrate the game on this disc into a native build that I can play. Do everything yourself; only ask me if the disc is missing or unusable, for a legal question, or for a platform you cannot build for. When you finish, give me the final report described in the playbook.
+
+The result is a repository of its own for that game (generated code stays on your machine; nothing of the disc is ever committed or uploaded).
+
 ## What is in here
 Platform facts only: instruction semantics, how to translate and test them, the BIOS/hardware surface a recompiled program needs,
 the register-level behaviour of each device, SDK-library conventions seen across executables, the pitfalls that cost time, and the

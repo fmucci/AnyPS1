@@ -18,7 +18,7 @@ The disc must be a **raw MODE2/2352 `.bin` (+ `.cue`)**, single data track. A co
 
 ## 2. Create the game repository
 ```
-cp -R <this repo>/template ~/work/<game>            # then: cd ~/work/<game> && git init && git add -A && git commit -m "template"
+cp -R <this repo>/template ~/work/<game> && cp <this repo>/PLAYBOOK.md ~/work/<game>/     # then: cd ~/work/<game> && git init && git add -A && git commit -m "template"
 python3 -I tools/init_game.py /path/to/disc.cue --name <short> --title "<Game Title>"
 python3 -I tools/recomp/find_hooks.py --write       # SDK functions recognised by signature -> game/hooks.csv
 tools/ref_emu/setup_ref.sh                          # reference emulator + host, built locally (about 5-10 min)

@@ -63,6 +63,7 @@ Use the reference emulator's savestates, a public walkthrough read with `WebSear
 Measure coverage: build once with `python3 -I tools/recomp/build_game.py -O1 --coverage` (PS1_GAME_OUT=ps1_game_cov keeps the normal build), run each scenario with `PS1_COVERAGE=run1.json`, then `python3 -I tools/coverage_report.py run*.json --funcs build/game/gen_<prefix>.funcs --md docs/coverage.md`. The report lists device features, CD commands, DMA channels, IRQ sources, BIOS calls and the percentage of recompiled functions entered, and **what was not exercised**: copy that list into the final report.
 
 ## 7. Give back (so the next game is easier)
+If you change anything generic in your instance's `runtime/` or `tools/`, port it to AnyPS1 `template/` and run `scripts/verify_template.sh` there before committing.
 Platform facts (not the game's): port them into AnyPS1 `docs/` (observed tag, how to re-check) and add new SDK function signatures to `data/sdk_signatures.csv`. Game-specific facts stay in the game repository.
 
 ## 8. When to ask the person (only these)

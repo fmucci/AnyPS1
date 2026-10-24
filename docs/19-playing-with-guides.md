@@ -36,6 +36,10 @@ Some bugs only show in game states you cannot reach with a title-screen smoke te
 - Every guide step that changes screen is a *transition* (fade, load): do not read the picture during it; read 100-200 frames later.
 - Random walking in the reference finds areas, but its press list is only valid from that state: keep the end states, not just the lists.
 - **Forked branches must not share the disc file offset**: children of `run_game --branch` inherit the open disc file description; stdio reads in sibling processes then interleave on one offset and corrupt each other (symptom: some branches stay on a black screen at the title overlay, different ones on each run). The runtime reopens the disc files in every child (`rt_hle_reopen_files`); any new open file a model keeps must do the same.
+- **Branch spec is `PREFIX:FIRST:STEP`** (first picture tick and the picture interval), not a length: the run length is the main `--ticks`. Writing `p:6000:50000` gives one picture and looks like a dead run.
+- A blind random walker stalls at **text-entry screens** (a naming screen): it types into it. Run it in short seeded segments instead, and keep the seeds in the route file; a route is then `base presses + manual segments + walk(start, frames, seed, set)` and is exactly reproducible (the first game's `route_play.py`).
+- A route found in the reference starting from a savestate can usually be **replayed on our build from the memory-card checkpoint** by shifting the press ticks so that its first press lands where control starts (about 100 ticks after the load): no re-tuning was needed for 50,000 ticks of rooftops, a name entry, cutscenes and a battle.
+- On macOS `sed -i` needs a suffix argument (`sed -i ''`); edit route files with python.
 - Treat a guide as **documented**, not observed: the game here is a specific release; names/steps can differ.
 
 ## What this replaces and what it does not

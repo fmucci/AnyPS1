@@ -37,3 +37,4 @@
 - 2026-10-23 · template: tools/bios_imports_check.py (acceptance check 4: imported BIOS calls vs implemented/registered), stub rows for A(A1h)/B(38h).
 - 2026-10-23 · template: run_game --branch guarded for Windows (no fork); Windows package of the second port built from a clean instance with docker/windows (acceptance check 8).
 - 2026-10-23 · template/19: forked --branch children reopen the disc files (shared file offset corrupted sibling reads); per-branch coverage file.
+- 2026-10-24 · 19: branch spec meaning, naming screens vs random walkers (seeded segments), replaying a reference route from the card checkpoint (worked for the second port's play battle).

@@ -112,6 +112,7 @@ def main():
     zpath = dist + ("-with-disc" if disc else "") + ".zip"
     with zipfile.ZipFile(zpath, "w", zipfile.ZIP_DEFLATED) as z:
         for fn in sorted(os.listdir(dist)):
+            if fn == "logs" or fn.endswith((".mcr", ".bin")): continue          # the player's own files and the disc never go into the zip (the disc only with --with-disc)
             z.write(os.path.join(dist, fn), os.path.join(name, fn))
         if disc:                                               # the disc is mostly compressed video: store it as is
             z.write(disc, os.path.join(name, DISCNAME), compress_type=zipfile.ZIP_STORED)

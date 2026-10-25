@@ -54,7 +54,7 @@ struct IoCtx {
     struct { uint16_t mode, ctrl, baud; uint8_t rx[8]; int nrx, state, irq_pend, busy, p_ack; uint8_t p_rx; uint16_t pad; uint32_t irq_flag; } sio;      /* SIO0: controller port 1 (finding 0006) */
     uint8_t *ram;
     char err[160];
-    uint32_t i_stat, i_mask;
+    uint32_t i_stat, i_mask; int spu_irqflag;
     Chan ch[7];
     uint32_t d0_madr, d0_left; int d0_pend, d0_hold;  /* d0_hold: the input transfer has been consumed but stays busy until the decoded output has been read; MDEC input DMA waiting for the decoder to drain its output (finding 0010) */
     uint32_t d1_madr, d1_left; int d1_pend;           /* MDEC output DMA waiting for decoded data (finding 0010) */
@@ -929,7 +929,7 @@ static int dma_start(IoCtx *x, int n) {
     Chan *c = &x->ch[n];
     COV(RT_COV_DMA, n);
     uint32_t sync = (c->chcr >> 9) & 3, from_ram = c->chcr & 1;
-    if (getenv("PS1_DMALOG")) fprintf(stderr, "[dma] start channel %d chcr %08x bcr %08x madr %06x dpcr %08x\n", n, c->chcr, c->bcr, c->madr, x->dpcr);
+    if (getenv("PS1_DMALOG")) fprintf(stderr, "[dma] frame %llu start channel %d chcr %08x bcr %08x madr %06x dpcr %08x\n", (unsigned long long)x->frames, n, c->chcr, c->bcr, c->madr, x->dpcr);
     if (!((x->dpcr >> (4 * n + 3)) & 1)) return 1;          /* master-disabled: the channel stays busy (CHCR bit 24 set) and runs when DPCR enables it (DuckStation dma.cpp CanTransferChannel; psx-spx DPCR) */
     uint32_t a = c->madr & 0x1FFFFC;
     if (n == 2) {
@@ -1194,7 +1194,7 @@ uint32_t io_read(IoCtx *x, uint32_t p, unsigned size, int *ok) {
         if (p == 0x1F801DB8 || p == 0x1F801DBA) return (uint32_t)(uint16_t)fixvol(x->spu_r[(0x1D80 + (p & 2) - 0x1C00) >> 1]);   /* current main volume */
         if (p == 0x1F801D9C) return x->spu.endx & 0xFFFF;
         if (p == 0x1F801D9E) return (x->spu.endx >> 16) & 0xFF;
-        return p == 0x1F801DAE ? (x->spu_r[(0x1F801DAA - 0x1F801C00) >> 1] & 0x3F) : x->spu_r[(p - 0x1F801C00) >> 1];   /* SPUSTAT: bits 0-5 mirror SPUCNT (psx-spx), the rest reads 0 */
+        return p == 0x1F801DAE ? ((x->spu_r[(0x1F801DAA - 0x1F801C00) >> 1] & 0x3F) | (x->spu_irqflag ? 0x40 : 0)) : x->spu_r[(p - 0x1F801C00) >> 1];   /* SPUSTAT: bits 0-5 mirror SPUCNT (psx-spx), the rest reads 0 */
     }
     else if (base >= 0x1F801080 && base < 0x1F8010F0) {
         int n = (base - 0x1F801080) >> 4, r = (base >> 2) & 3;
@@ -1223,6 +1223,7 @@ void io_write(IoCtx *x, uint32_t p, unsigned size, uint32_t v, int *ok) {
         if (size == 4 && !(p & 3)) { io_write(x, p, 2, v & 0xFFFF, ok); if (*ok) io_write(x, p + 2, 2, v >> 16, ok); return; }      /* a word access is two halfword accesses, low half first (psx-spx) */
         if (size != 2 || (p & 1)) { *ok = bad(x, "SPU write at %08x (%u bytes): only halfword and word registers are proven used", p, size); return; }
         x->spu_r[(p - 0x1F801C00) >> 1] = (uint16_t)v; x->c_spu_w++;
+        { static int vl = -1; if (vl < 0) vl = getenv("PS1_SPUVOL") ? atoi(getenv("PS1_SPUVOL")) : -2; if (vl >= 0 && p < 0x1F801D80 && ((p - 0x1F801C00) >> 4) == (uint32_t)vl && (p & 0xF) < 4) fprintf(stderr, "[spuvol] frame %llu v%d reg %x <- %04x\n", (unsigned long long)x->frames, vl, (unsigned)(p & 0xF), (unsigned)(uint16_t)v); }      /* debug aid: PS1_SPUVOL=N logs the volume register writes of voice N */
         if (p >= 0x1F801D80) { char k[12]; snprintf(k, sizeof k, "SPU%04x", p & 0xFFFF); gpulog_note(k, (uint16_t)v); }      /* PS1_GPULOG also lists the SPU control/reverb register values */
         else if (p == 0x1F801C04 || p == 0x1F801C06) { /* voice pitch/start: not listed (too many) */ }
         if (p == 0x1F801D88 || p == 0x1F801D8A) {                                   /* KON */
@@ -1237,6 +1238,9 @@ void io_write(IoCtx *x, uint32_t p, unsigned size, uint32_t v, int *ok) {
             if (kd) for (int n = 0; n < 24; n++) if (bits >> n & 1) fprintf(stderr, "[koff] frame %llu v%d\n", (unsigned long long)x->frames, n);
             for (int n = 0; n < 24; n++) if ((bits >> n & 1) && x->spu.v[n].on) { x->spu.v[n].phase = 3; x->spu.v[n].adsr_cnt = 0; }     /* release starts at once: the running rate counter of the previous phase (a sustain with shift 31 counts for ~1M samples) must not delay it (finding 0045) */
         } else if (p == 0x1F801DA2) x->spu.rev_addr = (uint32_t)(uint16_t)v * 8;
+        if (p < 0x1F801D80 && (p & 0xF) == 0xE) { Voice *rv = &x->spu.v[(p - 0x1F801C00) >> 4]; rv->rep = (((uint32_t)(uint16_t)v & ~1u) << 3) & 0x7FFF0; rv->rep_valid = 1; }      /* ADPCM repeat address register */
+        if (getenv("PS1_SPUIRQ") && (p == 0x1F801DA4 || p == 0x1F801DAA)) fprintf(stderr, "[spuirq] frame %llu reg %04x <- %04x\n", (unsigned long long)x->frames, (unsigned)(p & 0xFFFF), (unsigned)(uint16_t)v);
+        if (p == 0x1F801DAA && !(v & 0x40)) x->spu_irqflag = 0;                       /* SPUCNT bit 6 = 0 acknowledges the SPU IRQ */
         if (p == 0x1F801DA6) x->spu_addr = ((uint32_t)(uint16_t)v * 8) & 0x7FFFF;
         else if (p == 0x1F801DA8) { uint16_t h = (uint16_t)v; memcpy(x->spuram + (x->spu_addr & 0x7FFFE), &h, 2); x->spu_addr = (x->spu_addr + 2) & 0x7FFFF; }
         return;

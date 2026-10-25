@@ -21,8 +21,14 @@
 Start-up keys off/on all 24 voices; fades by stepping main and CD volumes; reverb programmed once with a preset and enabled per voice via the EON mask;
 noise and pitch modulation unused.
 
+## SPU IRQ and the repeat address (observed, second port, finding 0019)
+**Observed.** A game streamed the sound of its full-motion videos with the SPU IRQ, and a model without it plays every video in silence while everything else (music, effects, picture) looks right. The pattern: the program DMAs a buffer into sound RAM (here 8 KB at 1100h), writes the **ADPCM repeat address register (1C0Eh+16n) of two voices *before* key-on**, sets the IRQ address (1DA4h, in 8-byte units) at the start of the block just past the voices' loop end, sets SPUCNT bit 6, keys the voices on, and waits: when the voices reach the end the IRQ handler (I_STAT bit 9) DMAs the next chunk and moves the IRQ address to the other half. It repeated every 4 video frames for the whole video.
+**Model that works.** (1) A write to 1C0Eh+16n sets the voice's repeat address; key-on keeps a repeat address that was written or set by a loop-start block (it only defaults to the start address if neither happened); the reference core does the same. (2) IRQ: SPUCNT bit 6 enables, SPUSTAT bit 6 is the flag, writing SPUCNT bit 6 = 0 clears it, I_STAT bit 9 is raised once per flag. (3) The IRQ address is checked against the 16-byte block a voice fetches **and against the block its pointer has stepped to when a loop-end flag sends it back** (the voices of this game end their buffer on a flagged block and the IRQ address lies in the block after it; checking only fetched blocks never fires).
+**How it was found.** Silence only for some input paths looked like a state bug; the log of SPU DMA starts per 100 frames showed the reference doing one every 4 frames and ours none; the callback addresses of the reference's interrupt dispatcher showed they were called for I_STAT bit 9; logging the IRQ source inside the reference core (channel and position) gave the voice and block; logging repeat-address writes gave the missing register. The reference's own comment says all voices keep advancing when stopped and can raise the IRQ; this model does not do that (unknown whether a game needs it).
+**Check.** SPU DMA starts per 100 frames and envelope correlation of the movie audio against the reference (0.98 at a constant shift), plus a unit test (`test_spu_irq`: IRQ raised, flag, acknowledge, repeat address survives key-on).
+
 ## Not modelled
-SPU IRQ address (register kept as storage), capture buffers, sweep volumes (end value), 25-point XA resampler, 8-bit XA, exact transfer timing (instantaneous).
+IRQ from DMA or manual writes to sound RAM and from stopped voices, capture buffers, sweep volumes (end value), 25-point XA resampler, 8-bit XA, exact transfer timing (instantaneous).
 
 Origin: f2b#0011, 0025, 0029.
 

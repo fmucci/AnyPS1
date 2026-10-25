@@ -35,3 +35,6 @@ Disassemblers can mis-decode COP2 in delay slots and tiny leaf functions without
 data. Keep generated C and every game-derived artefact out of version control.
 
 - **A fatal strict-check on a tiny access is not a model bug by default** (second title): before widening, find the pc, the pointer origin (null + offset here), what the value is compared against, and whether the reference returns something different; then allow only those addresses (see 04).
+
+- **Silent video, everything else fine** (second title): before blaming the XA/CD path, count the SPU DMA starts over time and compare with a reference; if the reference streams every few frames and the model never does, look for the SPU IRQ (doc 10) and for the interrupt handler registered for I_STAT bit 9. The submode of the video sectors (here plain data) says nothing about where the sound is: the audio rode inside the video data and was fed to the SPU by the program.
+- **Always test the intro with the input a person gives** (second title): scripted routes without any early button press passed for weeks while a person's first Start press changed the path (an earlier fade, a movie starting at another moment). Record real sessions (`play.sh` writes `logs/*.rec`) and replay them in the model and in the reference.

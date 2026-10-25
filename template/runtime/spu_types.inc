@@ -7,6 +7,7 @@ typedef struct {
     int level, adsr_cnt;           /* ADSR level 0..7FFF and the wait counter (44.1 kHz cycles) */
     uint32_t cur;                  /* current byte address of the ADPCM block */
     uint32_t rep;                  /* repeat address (bytes) */
+    int rep_valid;                 /* the repeat address was written by the program or set by a loop-start block: key-on keeps it (finding 0019) */
     uint32_t counter;              /* pitch counter: bit 12.. = sample index within the block */
     int s[28 + 3];                 /* [0..2] = the 3 previous samples, then the 28 of the current block */
     int old, older;

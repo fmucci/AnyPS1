@@ -38,3 +38,4 @@
 - 2026-10-23 · template: run_game --branch guarded for Windows (no fork); Windows package of the second port built from a clean instance with docker/windows (acceptance check 8).
 - 2026-10-23 · template/19: forked --branch children reopen the disc files (shared file offset corrupted sibling reads); per-branch coverage file.
 - 2026-10-24 · 19: branch spec meaning, naming screens vs random walkers (seeded segments), replaying a reference route from the card checkpoint (worked for the second port's play battle).
+- 2026-10-25 · 10: SPU IRQ + repeat-address register (movie sound of the second port); 13: silent video, test with human input; template: player with fast forward, F12 screenshots, audio level log, `--press`, `play.sh` records sessions, `rec2press.py`, packaging keeps the player's files.

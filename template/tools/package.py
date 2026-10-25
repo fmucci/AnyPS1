@@ -27,7 +27,7 @@ recompiled from it; do not share this folder.
 
 Run:   play.bat      (uses "@DISC@" from this folder when present; otherwise pass the path: play.bat "C:\\path\\to\\@DISC@", or drag the .bin onto play.bat)
 Keys:  arrows = d-pad, Z = cross, X = circle, A = square, S = triangle, Q/W = L1/R1, E/R = L2/R2, Enter = start, Right Shift = select,
-       F11 = fullscreen, Esc = quit.  Game controllers work too.
+       F11 = fullscreen, Esc = quit, hold Tab = fast forward, F12 = screenshot (logs/).  Game controllers work too.
 Saves: @NAME@.mcr in this folder (a virtual memory card); written when you quit.
 Options (ps1_play.exe): --scale N, --fullscreen, --no-sync (run unthrottled), --card FILE
 Report: whether it starts, picture, sound, controls, speed, and any text printed in the console window.
@@ -95,14 +95,19 @@ def main():
     what = args[0] if args else "native"
     src, name = windows() if what == "windows" else linux() if what == "linux" else native()
     dist = os.path.join(ROOT, "dist", name)
-    shutil.rmtree(dist, ignore_errors=True)
-    shutil.copytree(src, dist)
+    keep = {"logs"}                                            # the player's own files (sessions, saves, the disc link) survive a rebuild
+    if os.path.isdir(dist):
+        for fn in os.listdir(dist):
+            if fn in keep or fn.endswith((".mcr", ".bin")): continue
+            fp = os.path.join(dist, fn); shutil.rmtree(fp) if os.path.isdir(fp) and not os.path.islink(fp) else os.remove(fp)
+    shutil.copytree(src, dist, dirs_exist_ok=True)
     open(os.path.join(dist, "README.txt"), "w", newline="\r\n" if what == "windows" else "\n").write(fill(README if what == "windows" else README.replace("play.bat      (uses \"@DISC@\" from this folder when present; otherwise pass the path: play.bat \"C:\\path\\to\\@DISC@\", or drag the .bin onto play.bat)", "./ps1_play \"/path/to/@DISC@\"   (Linux needs the SDL2 runtime: libsdl2-2.0-0)")))
     if what == "windows":
         open(os.path.join(dist, "play.bat"), "w", newline="\r\n").write(fill(PLAY_BAT))
     else:
         sh = os.path.join(dist, "play.sh")
-        open(sh, "w").write('#!/bin/sh\ncd "$(dirname "$0")"\nDISC="${1:-' + DISCNAME + '}"\nexec ./ps1_play "$DISC"\n')
+        open(sh, "w").write('#!/bin/sh\ncd "$(dirname "$0")"\nDISC="${1:-' + DISCNAME + '}"\nmkdir -p logs\nTS=$(date +%Y%m%d-%H%M%S)\n# every session: logs/session-TS.rec = the pad input (see rec2press.py), logs/session-TS.log = the console output\n./ps1_play "$DISC" --record "logs/session-$TS.rec" 2>&1 | tee "logs/session-$TS.log"\n')
+        shutil.copy(os.path.join(ROOT, "tools", "ref_emu", "rec2press.py"), os.path.join(dist, "rec2press.py"))
         os.chmod(sh, 0o755)
     zpath = dist + ("-with-disc" if disc else "") + ".zip"
     with zipfile.ZipFile(zpath, "w", zipfile.ZIP_DEFLATED) as z:

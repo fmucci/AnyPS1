@@ -1,0 +1,8 @@
+@@ -1214,6 +1214,7 @@
+     if (p >= 0x1F801C00 && p < 0x1F801E00) {
+         if (size != 2 || (p & 1)) { *ok = bad(x, "SPU write at %08x (%u bytes): only halfword registers are proven used", p, size); return; }
+         x->spu_r[(p - 0x1F801C00) >> 1] = (uint16_t)v; x->c_spu_w++;
++        { static int vl = -1; if (vl < 0) vl = getenv("PS1_SPUVOL") ? atoi(getenv("PS1_SPUVOL")) : -2; if (vl >= 0 && p < 0x1F801D80 && ((p - 0x1F801C00) >> 4) == (uint32_t)vl && (p & 0xF) < 4) fprintf(stderr, "[spuvol] frame %llu v%d reg %x <- %04x\n", (unsigned long long)x->frames, vl, (unsigned)(p & 0xF), (unsigned)(uint16_t)v); }      /* debug aid: PS1_SPUVOL=N logs the volume register writes of voice N */
+         if (p >= 0x1F801D80) { char k[12]; snprintf(k, sizeof k, "SPU%04x", p & 0xFFFF); gpulog_note(k, (uint16_t)v); }      /* FF9_GPULOG also lists the SPU control/reverb register values */
+         else if (p == 0x1F801C04 || p == 0x1F801C06) { /* voice pitch/start: not listed (too many) */ }
+         if (p == 0x1F801D88 || p == 0x1F801D8A) {                                   /* KON */

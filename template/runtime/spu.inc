@@ -2,20 +2,30 @@
 /* SPU model (queue P4-3), included by io.c. Sources: psx-spx "SPU ADPCM Samples / ADPCM Pitch / Volume and ADSR Generator / Voice Flags / Noise
  * Generator / Control and Status Register / Reverb Registers / Reverb Formula" and "CDROM XA Audio ADPCM Compression". Samples are generated at
  * 44100 Hz, 735 per virtual frame (io_vblank_tick), into a ring buffer that the host drains with io_spu_pull; the output also feeds a hash so the
- * differential tests compare audio exactly. Not modelled: SPU IRQ address, voice volume sweep (applied as an immediate target), capture buffers,
+ * differential tests compare audio exactly. SPU IRQ: raised (I_STAT bit 9) when a voice's ADPCM block fetch covers the IRQ address (finding 0019). Not modelled: voice volume sweep (applied as an immediate target), capture buffers,
  * the 25-point XA resampling filter (linear interpolation instead). */
 
 static int s16c(int v) { return v < -32768 ? -32768 : v > 32767 ? 32767 : v; }
 
 static const int adpcm_f0[5] = {0, 60, 115, 98, 122}, adpcm_f1[5] = {0, 0, -52, -55, -60};
 
+/* SPU IRQ (registers 1F801DA4 = address / 8, SPUCNT bit 6 = enable, SPUSTAT bit 6 = flag; writing the enable bit as 0 acknowledges): the movie sound streams of the game use it to learn that a
+ * half of the ring buffer was played (finding 0019). The hardware raises it when the SPU reads the 8-byte word at that address: here, when a voice fetches the 16-byte block holding it. */
+static void spu_irq_check(IoCtx *x, uint32_t blk) {
+    uint16_t cnt = x->spu_r[(0x1F801DAA - 0x1F801C00) >> 1];
+    if (!(cnt & 0x40) || (x->spu_irqflag)) return;
+    uint32_t a = ((uint32_t)x->spu_r[(0x1F801DA4 - 0x1F801C00) >> 1] * 8) & 0x7FFF8;
+    if (a >= (blk & 0x7FFF0) && a < (blk & 0x7FFF0) + 16) { x->spu_irqflag = 1; x->i_stat |= 1u << 9; if (getenv("PS1_SPUIRQ")) fprintf(stderr, "[spuirq] frame %llu raised at %05x (i_mask %04x)\n", (unsigned long long)x->frames, (unsigned)a, (unsigned)x->i_mask); }
+}
+
 static void spu_decode_block(IoCtx *x, Voice *v) {
+    spu_irq_check(x, v->cur);
     const uint8_t *b = x->spuram + (v->cur & 0x7FFF0);
     int shift = b[0] & 0xF, filter = (b[0] >> 4) & 7;
     if (shift > 12) shift = 9;
     if (filter > 4) filter = 4;
     v->blk_flags = b[1];
-    if (v->blk_flags & 4) v->rep = v->cur & 0x7FFF0;                      /* loop start */
+    if (v->blk_flags & 4) { v->rep = v->cur & 0x7FFF0; v->rep_valid = 1; }                      /* loop start */
     v->s[0] = v->s[28]; v->s[1] = v->s[29]; v->s[2] = v->s[30];           /* keep the last 3 samples for interpolation */
     for (int j = 0; j < 28; j++) {
         int nib = (b[2 + j / 2] >> ((j & 1) * 4)) & 0xF;
@@ -29,7 +39,7 @@ static void spu_decode_block(IoCtx *x, Voice *v) {
 static void spu_keyon(IoCtx *x, int n) {
     Voice *v = &x->spu.v[n];
     v->on = 1; v->phase = 0; v->level = 0; v->adsr_cnt = 0;
-    v->cur = (uint32_t)(*spu_reg(x, 0x1C06 + 0x10 * n)) * 8; v->rep = v->cur;
+    v->cur = (uint32_t)(*spu_reg(x, 0x1C06 + 0x10 * n)) * 8; if (!v->rep_valid) v->rep = v->cur;      /* a repeat address written before key-on survives it: the movie sound of the game depends on it (finding 0019) */
     v->counter = 0; v->old = v->older = 0; memset(v->s, 0, sizeof v->s);
     x->spu.endx &= ~(1u << n);
     spu_decode_block(x, v);
@@ -94,6 +104,7 @@ static void spu_sample(IoCtx *x, int *ol, int *or_) {
         while (v->counter >= 0x1C000) {                              /* 28 samples consumed: next block */
             v->counter -= 0x1C000;
             int fl = v->blk_flags;
+            spu_irq_check(x, v->cur);                                 /* the pointer has stepped past the block that carries the loop-end flag when the jump back happens: the movie sound buffers end on this (finding 0019) */
             if (fl & 1) {                                           /* loop end */
                 p->endx |= 1u << n;
                 v->cur = v->rep;

@@ -51,6 +51,30 @@ static void test_adpcm_and_adsr(void) {
     io_free(x);
 }
 
+static void test_spu_irq(void) {
+    /* finding 0019: the movie sound of the game streams through the SPU IRQ: it sets the repeat address of two voices and an IRQ address one block behind the end of the voice's loop;
+     * the IRQ fires when the voice's pointer steps past the loop-end block (before the jump back), and the repeat address written before key-on survives the key-on */
+    IoCtx *x = mk();
+    memset(x->spuram + 0x1100, 0, 0x2000);
+    x->spuram[0x1100 + 0xF0 + 1] = 3;                                 /* block 0x11F0: loop end + repeat */
+    w16(x, 0x1F801D80, 0x3FFF); w16(x, 0x1F801DAA, 0x8000);           /* SPU on */
+    w16(x, 0x1F801C06, 0x1100 / 8);                                   /* voice 0 start */
+    w16(x, 0x1F801C0E, 0x2100 / 8);                                   /* voice 0 repeat address, written BEFORE key-on */
+    w16(x, 0x1F801C04, 0x1000); w16(x, 0x1F801C08, 0x00FF); w16(x, 0x1F801C0A, 0x0000);
+    w16(x, 0x1F801DA4, 0x2108 / 8);                                   /* IRQ address in the block after the loop end... */
+    w16(x, 0x1F801DAA, 0x80C0 | 0x8000);                              /* ...IRQ enable (bit 6) */
+    w16(x, 0x1F801D88, 1);                                            /* key on voice 0 */
+    CHECK(x->spu.v[0].rep == 0x2100, "repeat address survives key-on: %x", (unsigned)x->spu.v[0].rep);
+    for (int f = 0; f < 4 && !(x->i_stat & (1u << 9)); f++) io_vblank_tick(x);
+    CHECK(x->i_stat & (1u << 9), "SPU IRQ raised in I_STAT bit 9");
+    int ok = 1; uint32_t st = io_read(x, 0x1F801DAE, 2, &ok);
+    CHECK(st & 0x40, "SPUSTAT bit 6 = IRQ flag (%04x)", (unsigned)st);
+    w16(x, 0x1F801DAA, 0xC080 & ~0x40);                               /* SPUCNT bit 6 = 0 acknowledges */
+    st = io_read(x, 0x1F801DAE, 2, &ok);
+    CHECK(!(st & 0x40), "flag cleared by writing SPUCNT bit 6 = 0 (%04x)", (unsigned)st);
+    io_free(x);
+}
+
 static void test_adsr_release(void) {
     /* finding 0045: the game treats a voice as free only when its current ADSR volume reads 0, so a release has to reach exactly 0 and has to start at once */
     IoCtx *x = mk();
@@ -400,7 +424,7 @@ static void test_mdec(void) {
 }
 
 int main(void) {
-    test_adpcm_and_adsr(); test_adsr_release(); test_spu_output(); test_xa_decode(); test_mdec(); test_cd(); test_gpu(); test_gpu_hardware_semantics(); test_dma_register_semantics(); test_dma_irq_deferred(); test_sio_pad(); test_mdec_dma_stall(); test_clut_cache(); test_timer2();
+    test_adpcm_and_adsr(); test_adsr_release(); test_spu_irq(); test_spu_output(); test_xa_decode(); test_mdec(); test_cd(); test_gpu(); test_gpu_hardware_semantics(); test_dma_register_semantics(); test_dma_irq_deferred(); test_sio_pad(); test_mdec_dma_stall(); test_clut_cache(); test_timer2();
     printf("%d checks, %d failed\n", g_n, g_fail);
     return g_fail ? 1 : 0;
 }

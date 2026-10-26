@@ -136,8 +136,19 @@ static void cd_read_sector(IoCtx *x) {                  /* load the sector at cu
     c->sec_valid = 1;
 }
 
+#ifdef RT_CALLTRACE
+extern uint32_t rt_ct[4096]; extern unsigned rt_cti;
+#endif
 static void cd_command(IoCtx *x, int cmd) {
     Cd *c = &x->cd;
+#ifdef RT_CALLTRACE
+    if (cmd == 2 && getenv("PS1_CDRING") && c->tick >= (unsigned)atoi(getenv("PS1_CDTICK") ? getenv("PS1_CDTICK") : "0")) {   /* debug aid (build with --calltrace): the last N function entries at every Setloc, consecutive repeats collapsed */
+        unsigned n = (unsigned)atoi(getenv("PS1_CDRING")); if (n > 4096) n = 4096;
+        fprintf(stderr, "[cdring] tick %u setloc:", c->tick);
+        for (unsigned i = 0, last = 0; i < n; i++) { unsigned v = rt_ct[(rt_cti + 4096 - n + i) & 4095]; if (v != last) fprintf(stderr, " %08x", v); last = v; }
+        fprintf(stderr, "\n");
+    }
+#endif
     COV(RT_COV_CD_CMD, cmd);
     if (getenv("PS1_CDLOG")) { fprintf(stderr, "[cd] tick %u cmd %02x params", c->tick, cmd); for (int i = 0; i < c->nparam; i++) fprintf(stderr, " %02x", c->param[i]); fprintf(stderr, "  (target %d cur %d mode %02x)\n", c->target, c->cur, c->mode); }
     uint8_t st = cd_stat(x), r[16];

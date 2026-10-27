@@ -87,6 +87,9 @@ static void tick_hook(Cpu *c, void *ud) {
         if (now_s(h) > target + 0.5) h->t0 = SDL_GetPerformanceCounter() - (Uint64)(target * (double)SDL_GetPerformanceFrequency());   /* fell far behind: do not try to catch up */
     }
     if (!ff || (h->frame & 3) == 0) present(h, c);
+    { static unsigned shot_t = ~0u; static const char *shot_f; static int si;                  /* debug aid: PS1_SHOT=TICK:FILE.ppm writes the picture of that virtual frame (headless check of what the player shows: SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy) */
+      if (!si) { si = 1; const char *e = getenv("PS1_SHOT"); if (e) { shot_t = (unsigned)atoi(e); const char *k = strchr(e, ':'); shot_f = k ? k + 1 : "shot.ppm"; } }
+      if (rt_hle_ticks() == shot_t && h->tw) { FILE *f = fopen(shot_f, "wb"); if (f) { fprintf(f, "P6\n%d %d\n255\n", h->tw, h->th); fwrite(h->rgb, 3, (size_t)h->tw * h->th, f); fclose(f); fprintf(stderr, "[play] %s\n", shot_f); } } }
     { static int pl = -1; static uint64_t last; static double mn = 1e9, mx = 0, sum = 0; static unsigned n;           /* debug aid: PS1_PACELOG=1 prints the wall-clock interval between pictures (ms) every 600 ticks */
       if (pl < 0) pl = getenv("PS1_PACELOG") != NULL;
       if (pl) { uint64_t t = SDL_GetPerformanceCounter(); if (last) { double ms = 1000.0 * (double)(t - last) / (double)SDL_GetPerformanceFrequency(); if (ms < mn) mn = ms; if (ms > mx) mx = ms; sum += ms; n++; if (n == 600) { fprintf(stderr, "[pace] 600 pictures: mean %.2f ms min %.2f max %.2f\n", sum / n, mn, mx); n = 0; sum = 0; mn = 1e9; mx = 0; } } last = t; } }

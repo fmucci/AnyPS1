@@ -106,7 +106,7 @@ def main():
         open(os.path.join(dist, "play.bat"), "w", newline="\r\n").write(fill(PLAY_BAT))
     else:
         sh = os.path.join(dist, "play.sh")
-        open(sh, "w").write('#!/bin/sh\ncd "$(dirname "$0")"\nDISC="${1:-' + DISCNAME + '}"\nmkdir -p logs\nTS=$(date +%Y%m%d-%H%M%S)\n# every session: logs/session-TS.rec = the pad input (see rec2press.py), logs/session-TS.log = the console output\n./ps1_play "$DISC" --record "logs/session-$TS.rec" 2>&1 | tee "logs/session-$TS.log"\n')
+        open(sh, "w").write('#!/bin/sh\ncd "$(dirname "$0")"\nDISC="${1:-' + DISCNAME + '}"\nmkdir -p logs\nTS=$(date +%Y%m%d-%H%M%S)\n# the card the session starts with (written by the player only when the window is closed): needed to replay the session later\nfor C in *.mcr; do [ -f "$C" ] && cp "$C" "logs/session-$TS.start-$C"; done\n# every session: logs/session-TS.rec = the pad input (see rec2press.py), logs/session-TS.log = the console output\n./ps1_play "$DISC" --record "logs/session-$TS.rec" 2>&1 | tee "logs/session-$TS.log"\n')
         shutil.copy(os.path.join(ROOT, "tools", "ref_emu", "rec2press.py"), os.path.join(dist, "rec2press.py"))
         os.chmod(sh, 0o755)
     zpath = dist + ("-with-disc" if disc else "") + ".zip"

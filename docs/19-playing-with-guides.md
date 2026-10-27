@@ -50,3 +50,6 @@ It replaces a person for *reaching* states and for *judging that two builds show
 
 ## Testing memory-card flows without a person
 The game's own save and load screens can be driven headless with `--press` lists and `--ppm-every PREFIX:FIRST:STEP`, reading the pictures at each step: new block, overwrite (the "Overwrite?" box defaults to No), slot 2 with no card, blank and zeroed images. Check the card image after each step (every 128-byte frame XORs to its last byte; No must leave the image byte-identical) and keep the press lists as routes: they are exact only for the same list, because the screens appear earlier or later with different input. A zeroed (unformatted) image is the case the BIOS layer can get wrong silently: the real game asks to format.
+
+## What a person's own save gives
+A person's card is a better starting point than any replay: load it through Continue, read the Load screen (character, level, play time, place) and fork walker branches from it (`tools/route/owalk.py`, `run_game --branch`). An exact replay of an interactive session can diverge from the person's audio level after a while even when the first thousand ticks match to the digit (FF9, 2026-10-27: equal until tick 1800, 3-10 % off after it, not explained by a press offset); trust the card, not the replay, for where the person was.

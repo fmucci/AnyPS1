@@ -47,3 +47,4 @@
 - 2026-10-27 · tools/ref_emu/rec2press.py: `--squeeze TICKS` caps idle stretches (no button held) so a session with long pauses replays quickly (not bit-exact after the first squeeze); docs/19 updated.
 - 2026-10-27 · docs/19: testing memory-card flows headless through the game's own screens (new block, overwrite, slot 2, blank/zeroed images); unformatted-card behaviour flagged.
 - 2026-10-27 · template runtime/hle.c: BIOS B(38h) exit and A(A1h) SystemErrorBootOrDiskFailure end the run with a named message (caller and arguments) instead of 'not implemented'; the real BIOS leaves the program there. B(4Ch)/B(4Fh) are card-layer calls, active only when a card image is given (without one they stop as 'not implemented').
+- 2026-10-27 · docs/19: a person's card as the starting point (Load screen read, walker branches from it); exact replays can diverge after a while.

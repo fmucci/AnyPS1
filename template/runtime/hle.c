@@ -556,6 +556,8 @@ static void bios_dispatch(Cpu *c, char t, unsigned n) {
         }
     }
     RtFn f;
+    if (t == 'B' && n == 0x38) rt_fatal(c, "the program called BIOS exit(%d) from %08x: it ended itself (the real BIOS returns to the shell, there is nothing to run after it)", (int)c->r[4], c->r[31]);
+    if (t == 'A' && n == 0xA1) rt_fatal(c, "the program called BIOS SystemErrorBootOrDiskFailure(type %c, code %08x) from %08x: a boot or disc failure the real BIOS shows on its error screen", (char)c->r[4], c->r[5], c->r[31]);
     bios_dispatch_name(c, t, n, &f);
     if (!f) rt_fatal(c, "BIOS %c(%02X) is not implemented (called from %08x)", t, n, c->r[31]);
     if (f == h_file_write) {

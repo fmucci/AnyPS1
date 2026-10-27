@@ -15,6 +15,7 @@ def main(path, ours):
     last=ev[-1][0] if ev else 0
     for n,t in start.items(): out.append((n,t,last))
     out.sort(key=lambda x:x[1])
+    if ours: out=[(n,max(a-1,0),max(b-1,0)) for n,a,b in out]      # the player records a press at the frame that SAMPLED it +1; run_game/ps1_play --press apply a range from its first tick: one tick earlier (verified: the audio level at ticks 600..3000 of a person's session matches their log exactly only with this shift)
     fmt=lambda x:"%s@%d-%d"%x
     print(" ".join("--press "+fmt(x) for x in out) if ours else ",".join(map(fmt,out)))
 if __name__=="__main__": main(sys.argv[1], "--ours" in sys.argv)

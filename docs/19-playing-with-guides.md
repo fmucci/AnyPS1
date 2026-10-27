@@ -44,3 +44,6 @@ Some bugs only show in game states you cannot reach with a title-screen smoke te
 
 ## What this replaces and what it does not
 It replaces a person for *reaching* states and for *judging that two builds show the same picture*. It does not judge feel, balance or difficulty, and it cannot finish a game that needs puzzle knowledge the guide does not give. Coverage is reported (docs 18), not claimed.
+
+## Replaying a person's session
+`play.sh` (from `tools/package.py`) records `logs/session-TS.rec` (pad word per change), `logs/session-TS.log` and a copy of the starting card. Replay: `python3 -I tools/ref_emu/rec2press.py logs/session-TS.rec --ours > session.press`, then `build/ps1_game DISC --card START.mcr --ticks N $(cat session.press)`. Check it against the person's own log before trusting it: the player prints `audio rms` every 600 ticks; the replay's values (headless `ps1_play --no-sync` with `SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy`, or the same line from the runner) must equal them to the digit. A mismatch means the input is off by a tick or the starting state differs; a one-tick press (a Start that skips a movie) is the usual cause. Compare pictures with `PS1_SHOT=TICK:file.ppm`.

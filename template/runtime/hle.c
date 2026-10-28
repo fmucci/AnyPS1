@@ -149,6 +149,7 @@ void rt_hle_reopen_files(Cpu *c) { rt_disc_reopen(g_disc); io_cd_reopen(rt_io_ct
 void rt_hle_set_card(const char *path) { g_card = card_new(path); }
 void rt_hle_card_set_path(const char *path) { card_set_path(g_card, path); }
 int rt_hle_card_save(void) { return card_save(g_card); }
+unsigned rt_hle_card_gen(void) { return card_gen(g_card); }
 const uint8_t *rt_hle_card_image(void) { return g_card ? card_image(g_card) : NULL; }
 
 static void ev_reset(void);

@@ -67,8 +67,12 @@ int main(void) {
     CHECK(call(c, 'B', 0x4E, 0, 0x3F, 0x80000200, &nev, ev) == 1 && nev == 1 && ev[0][0] == 0xF0000011u && ev[0][1] == 4);
     CHECK(call(c, 'B', 0x4F, 0, 0x3F, 0x80000400, &nev, ev) == 1 && memcmp(ram + 0x400, ram + 0x200, 128) == 0);
     CHECK(call(c, 'B', 0x4F, 0, 0x401, 0x80000400, &nev, ev) == 0);                           /* out of range */
-    /* persistence */
+    /* persistence: the generation counter moves with every change and the save is atomic (no leftover temporary file, the file equals the image) */
+    unsigned g0 = card_gen(c);
+    CHECK(call(c, 'B', 0x4E, 0, 0x3E, 0x80000200, &nev, ev) == 1 && card_gen(c) != g0);
     CHECK(card_save(c));
+    { char tmp[600]; snprintf(tmp, sizeof tmp, "%s.tmp", path); FILE *tf = fopen(tmp, "rb"); CHECK(tf == NULL); if (tf) fclose(tf);
+      uint8_t disk[131072]; FILE *cf = fopen(path, "rb"); CHECK(cf && fread(disk, 1, sizeof disk, cf) == sizeof disk && memcmp(disk, card_image(c), sizeof disk) == 0); if (cf) fclose(cf); }
     card_free(c);
     c = card_new(path);
     img = card_image(c);

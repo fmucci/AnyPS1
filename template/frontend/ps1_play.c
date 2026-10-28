@@ -110,6 +110,8 @@ static void tick_hook(Cpu *c, void *ud) {
         else if (e.type == SDL_CONTROLLERDEVICEADDED && !h->pad) h->pad = SDL_GameControllerOpen(e.cdevice.which);
         else if (e.type == SDL_CONTROLLERDEVICEREMOVED && h->pad) { SDL_GameControllerClose(h->pad); h->pad = NULL; }
     }
+    { static unsigned seen, quiet; unsigned g = rt_hle_card_gen();                                 /* the card is written to disk 30 frames after the game's last change to it, so a force-quit, a crash or a power loss keeps the save (it was written only at exit) */
+      if (g != seen) { seen = g; quiet = 0; } else if (quiet < 1000 && ++quiet == 30 && !rt_hle_card_save()) fprintf(stderr, "[play] could not write the memory card\n"); }
     if (h->quit) { rt_hle_card_save(); SDL_Quit(); exit(0); }
     { uint32_t w = pad_word(h); if (!g_scripted) rt_pad_set(w);                                    /* the input of the next frame is sampled as late as possible */
       if (h->rec && w != h->last_word) { fprintf(h->rec, "%u %08x\n", rt_hle_ticks() + 1, w); fflush(h->rec); h->last_word = w; } }       /* recorded for the NEXT frame (replay applies it from that tick on) */

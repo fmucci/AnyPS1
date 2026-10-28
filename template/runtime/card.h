@@ -9,6 +9,7 @@ Card *card_new(const char *backing_path);   /* NULL = no card inserted; existing
 void card_free(Card *c);
 void card_set_path(Card *c, const char *backing_path);   /* later writes go to another file (forked branches of a run must not share one card file) */
 int card_event_delay(Card *c);               /* frames the events returned by the last card_call must wait before delivery */
+unsigned card_gen(Card *c);                  /* changes whenever the image does */
 int card_save(Card *c);                      /* writes the image to the backing file if it changed; 1 on success */
 const uint8_t *card_image(Card *c);          /* 131072 bytes */
 /* Runs BIOS call table/number `t`/`n` with arguments a0..a3 against guest RAM `ram` (2 MiB, masked addresses). Returns 1 if the call belongs to the

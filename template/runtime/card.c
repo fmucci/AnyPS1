@@ -11,10 +11,13 @@ typedef struct { int used, first, nblocks, size, pos, writable, async; } Fcb;   
 struct Card {
     uint8_t img[IMG];
     int present, dirty;
+    unsigned gen;                                                        /* counts every change of the image: the player writes the file once the game has been quiet for a while (not only when the window closes) */
     char path[512];
     Fcb fcb[16];
     int find_idx, find_deleted, last_error, status, auto_format, delay;     /* delay: frames the events of the last call wait (the reference BIOS moves one 128-byte sector per frame) */
 };
+static void touch(Card *c) { c->dirty = 1; c->gen++; }
+unsigned card_gen(Card *c) { return c ? c->gen : 0; }
 int card_event_delay(Card *c) { return c ? c->delay : 0; }
 
 static uint8_t xor_frame(const uint8_t *f) { uint8_t x = 0; for (int i = 0; i < 127; i++) x ^= f[i]; return x; }
@@ -27,7 +30,7 @@ static void format(Card *c) {
     for (int f = 16; f <= 35; f++) { memset(c->img + f * FR, 0, FR); memset(c->img + f * FR, 0xFF, 4); c->img[f * FR + 8] = 0xFF; c->img[f * FR + 9] = 0xFF; fix_dir(c, f); }
     for (int f = 36; f <= 62; f++) memset(c->img + f * FR, 0xFF, FR);
     memcpy(c->img + 63 * FR, c->img, FR);
-    c->dirty = 1;
+    touch(c);
 }
 static int formatted(Card *c) { return c->img[0] == 'M' && c->img[1] == 'C'; }
 
@@ -39,20 +42,27 @@ Card *card_new(const char *path) {
     c->present = 1; c->status = 1;
     snprintf(c->path, sizeof c->path, "%s", path);
     FILE *f = fopen(path, "rb");
-    if (f) { size_t n = fread(c->img, 1, IMG, f); fclose(f); if (n != IMG) memset(c->img, 0, IMG); }
-    else format(c);
-    c->dirty = 0;
+    if (f) { size_t n = fread(c->img, 1, IMG, f); fclose(f); if (n != IMG) memset(c->img, 0, IMG); c->dirty = 0; }
+    else format(c);                                                       /* a new card stays dirty: the player writes the (empty, formatted) file a moment after the start, so it exists even if the process is killed before the first save */
     return c;
 }
 void card_set_path(Card *c, const char *path) { if (c && path) snprintf(c->path, sizeof c->path, "%s", path); }
 void card_free(Card *c) { if (c) { card_save(c); free(c); } }
-int card_save(Card *c) {
+int card_save(Card *c) {                                                  /* atomic: a temporary file next to the card, then renamed over it, so a kill or power loss never leaves a half-written card */
     if (!c || !c->present || !c->dirty) return 1;
-    FILE *f = fopen(c->path, "wb");
+    char tmp[sizeof c->path + 8]; snprintf(tmp, sizeof tmp, "%s.tmp", c->path);
+    FILE *f = fopen(tmp, "wb");
     if (!f) return 0;
     int ok = fwrite(c->img, 1, IMG, f) == IMG;
-    fclose(f);
-    if (ok) c->dirty = 0;
+    ok = (fflush(f) == 0) && ok;
+    ok = (fclose(f) == 0) && ok;
+    if (ok) {
+#ifdef _WIN32
+        remove(c->path);                                                  /* rename does not replace an existing file on Windows */
+#endif
+        ok = rename(tmp, c->path) == 0;
+    }
+    if (ok) c->dirty = 0; else remove(tmp);
     return ok;
 }
 const uint8_t *card_image(Card *c) { return c->img; }
@@ -139,7 +149,7 @@ int card_call(Card *c, uint8_t *ram, char t, unsigned n, const uint32_t a[4], ui
         uint8_t *buf = gp(ram, a[2], FR);
         if (!buf || sec * FR + FR > IMG) { c->status = 0x21; evt(ev, nev, LL, 0x8000); return 1; }
         if (n == 0x4F) memcpy(buf, c->img + sec * FR, FR);
-        else { memcpy(c->img + sec * FR, buf, FR); c->dirty = 1; }
+        else { memcpy(c->img + sec * FR, buf, FR); touch(c); }
         done_ok(c, ev, nev, LL);
         return 1;
     }
@@ -168,7 +178,7 @@ int card_call(Card *c, uint8_t *ram, char t, unsigned n, const uint32_t a[4], ui
                 fix_dir(c, blocks[k]);
                 memset(c->img + blocks[k] * BLK, 0, BLK);
             }
-            c->dirty = 1;
+            touch(c);
             b = blocks[0];
             c->fcb[fd] = (Fcb){1, b, (int)nb, (int)(nb * BLK), 0, 1, (a[1] & 0x8000) != 0};
         } else {
@@ -203,7 +213,7 @@ int card_call(Card *c, uint8_t *ram, char t, unsigned n, const uint32_t a[4], ui
             for (int s = p / BLK; s > 0 && blk; s--) blk = next_block(c, blk);
             if (!blk) { cnt = k; break; }
             uint8_t *cell = c->img + blk * BLK + (p % BLK);
-            if (n == 0x34) buf[k] = *cell; else { *cell = buf[k]; c->dirty = 1; }
+            if (n == 0x34) buf[k] = *cell; else { *cell = buf[k]; touch(c); }
         }
         if (!(f->async && n == 0x34)) f->pos += (int)cnt;                         /* the reference BIOS leaves the position of an async read alone ("?? ff9" in its source: written for a title that needed it): the program seeks itself */
         *ret = cnt;
@@ -256,7 +266,7 @@ int card_call(Card *c, uint8_t *ram, char t, unsigned n, const uint32_t a[4], ui
             fix_dir(c, b);
             b = nx;
         }
-        c->dirty = 1;
+        touch(c);
         *ret = 1;
         done_ok(c, ev, nev, HL);
         return 1;

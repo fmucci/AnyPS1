@@ -28,7 +28,7 @@ recompiled from it; do not share this folder.
 Run:   play.bat      (uses "@DISC@" from this folder when present; otherwise pass the path: play.bat "C:\\path\\to\\@DISC@", or drag the .bin onto play.bat)
 Keys:  arrows = d-pad, Z = cross, X = circle, A = square, S = triangle, Q/W = L1/R1, E/R = L2/R2, Enter = start, Right Shift = select,
        F11 = fullscreen, Esc = quit, hold Tab = fast forward, F12 = screenshot (logs/).  Game controllers work too.
-Saves: @NAME@.mcr in this folder (a virtual memory card); written when you quit.
+Saves: @NAME@.mcr in this folder (a virtual memory card); written a few seconds after the game saves and again when you quit.\nLogs:  logs/session-*.rec (your pad input), .log (console) and .start-*.mcr (the card you started with): send them with a report, they let us replay your session.
 Options (ps1_play.exe): --scale N, --fullscreen, --no-sync (run unthrottled), --card FILE
 Report: whether it starts, picture, sound, controls, speed, and any text printed in the console window.
 """
@@ -42,8 +42,14 @@ if not "%~1"=="" (
 ) else (
   set /p DISC=Path to the game's .bin file: 
 )
-ps1_play.exe "%DISC%"
+if not exist logs mkdir logs
+for /f %%i in ('powershell -nologo -noprofile -command "Get-Date -Format yyyyMMdd-HHmmss"') do set TS=%%i
+rem the card the session starts with (the player also writes it a few seconds after the game saves): needed to replay the session later
+for %%C in (*.mcr) do copy /y "%%C" "logs\\session-%TS%.start-%%C" >nul
+rem logs\\session-TS.rec = the pad input (python rec2press.py), logs\\session-TS.log = the console output
+ps1_play.exe "%DISC%" --record "logs\\session-%TS%.rec" 2> "logs\\session-%TS%.log"
 echo.
+echo Session saved in the logs folder: send the session-%TS%.* files.
 pause
 """
 
@@ -101,14 +107,14 @@ def main():
             if fn in keep or fn.endswith((".mcr", ".bin")): continue
             fp = os.path.join(dist, fn); shutil.rmtree(fp) if os.path.isdir(fp) and not os.path.islink(fp) else os.remove(fp)
     shutil.copytree(src, dist, dirs_exist_ok=True)
-    open(os.path.join(dist, "README.txt"), "w", newline="\r\n" if what == "windows" else "\n").write(fill(README if what == "windows" else README.replace("play.bat      (uses \"@DISC@\" from this folder when present; otherwise pass the path: play.bat \"C:\\path\\to\\@DISC@\", or drag the .bin onto play.bat)", "./ps1_play \"/path/to/@DISC@\"   (Linux needs the SDL2 runtime: libsdl2-2.0-0)")))
+    open(os.path.join(dist, "README.txt"), "w", newline="\r\n" if what == "windows" else "\n").write(fill(README if what == "windows" else README.replace("play.bat      (uses \"@DISC@\" from this folder when present; otherwise pass the path: play.bat \"C:\\path\\to\\@DISC@\", or drag the .bin onto play.bat)", "./play.sh   (uses \"@DISC@\" from this folder when present, or ./play.sh \"/path/to/@DISC@\"; Linux needs the SDL2 runtime: libsdl2-2.0-0)")))
     if what == "windows":
         open(os.path.join(dist, "play.bat"), "w", newline="\r\n").write(fill(PLAY_BAT))
     else:
         sh = os.path.join(dist, "play.sh")
-        open(sh, "w").write('#!/bin/sh\ncd "$(dirname "$0")"\nDISC="${1:-' + DISCNAME + '}"\nmkdir -p logs\nTS=$(date +%Y%m%d-%H%M%S)\n# the card the session starts with (written by the player only when the window is closed): needed to replay the session later\nfor C in *.mcr; do [ -f "$C" ] && cp "$C" "logs/session-$TS.start-$C"; done\n# every session: logs/session-TS.rec = the pad input (see rec2press.py), logs/session-TS.log = the console output\n./ps1_play "$DISC" --record "logs/session-$TS.rec" 2>&1 | tee "logs/session-$TS.log"\n')
-        shutil.copy(os.path.join(ROOT, "tools", "ref_emu", "rec2press.py"), os.path.join(dist, "rec2press.py"))
+        open(sh, "w").write('#!/bin/sh\ncd "$(dirname "$0")"\nDISC="${1:-' + DISCNAME + '}"\nmkdir -p logs\nTS=$(date +%Y%m%d-%H%M%S)\n# the card the session starts with (the player rewrites it a few seconds after the game saves): needed to replay the session later\nfor C in *.mcr; do [ -f "$C" ] && cp "$C" "logs/session-$TS.start-$C"; done\n# every session: logs/session-TS.rec = the pad input (see rec2press.py), logs/session-TS.log = the console output\n./ps1_play "$DISC" --record "logs/session-$TS.rec" 2>&1 | tee "logs/session-$TS.log"\n')
         os.chmod(sh, 0o755)
+    shutil.copy(os.path.join(ROOT, "tools", "ref_emu", "rec2press.py"), os.path.join(dist, "rec2press.py"))
     zpath = dist + ("-with-disc" if disc else "") + ".zip"
     with zipfile.ZipFile(zpath, "w", zipfile.ZIP_DEFLATED) as z:
         for fn in sorted(os.listdir(dist)):

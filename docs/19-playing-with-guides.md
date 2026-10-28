@@ -53,3 +53,6 @@ The game's own save and load screens can be driven headless with `--press` lists
 
 ## What a person's own save gives
 A person's card is a better starting point than any replay: load it through Continue, read the Load screen (character, level, play time, place) and fork walker branches from it (`tools/route/owalk.py`, `run_game --branch`). An exact replay of an interactive session can diverge from the person's audio level after a while even when the first thousand ticks match to the digit (FF9, 2026-10-27: equal until tick 1800, 3-10 % off after it, not explained by a press offset); trust the card, not the replay, for where the person was.
+
+## Logging a tester's sessions (all platforms)
+`play.sh` and `play.bat` both write `logs/session-TS.rec`, `.log` and `.start-*.mcr`; ask the tester to send those three files. Windows has no `tee`, so the console text goes only to the log file.

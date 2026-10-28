@@ -8,6 +8,8 @@ typedef struct Card Card;
 Card *card_new(const char *backing_path);   /* NULL = no card inserted; existing file is loaded, a missing file is created formatted on first write */
 void card_free(Card *c);
 void card_set_path(Card *c, const char *backing_path);   /* later writes go to another file (forked branches of a run must not share one card file) */
+void card_set_load_frames(Card *c, int frames);          /* 0 (default): _card_load answers after 2 frames; N > 0: after N frames, with the HwCARD event every 2 frames in between (measured in a reference BIOS for the first title, see docs/11) */
+int card_load_frames(Card *c);
 int card_event_delay(Card *c);               /* frames the events returned by the last card_call must wait before delivery */
 unsigned card_gen(Card *c);                  /* changes whenever the image does */
 int card_save(Card *c);                      /* writes the image to the backing file if it changed; 1 on success */

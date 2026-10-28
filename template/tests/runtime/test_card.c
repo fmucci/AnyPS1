@@ -108,6 +108,10 @@ int main(void) {
     call(c, 'B', 0x33, fd, 0x80, 1, &nev, ev);
     CHECK(call(c, 'B', 0x34, fd, 0x80180200, 0x80, &nev, ev) == 0x80 && memcmp(ram + 0x180200, ram + 0x300000 / 2 + 0x80, 0x80) == 0);
     CHECK(call(c, 'A', 0xAC, 0, 0, 0, &nev, ev) == 1 && nev == 2 && ev[0][0] == 0xF4000001u && ev[1][0] == 0xF0000011u && card_event_delay(c) == 2);   /* _card_load: SwCARD then HwCARD, 3 frames */
+    card_set_load_frames(c, 72);                                                  /* a game whose menu needs the long load (docs/11): SwCARD after 72 frames */
+    CHECK(card_load_frames(c) == 72 && call(c, 'A', 0xAC, 0, 0, 0, &nev, ev) == 1 && nev == 2 && card_event_delay(c) == 72);
+    card_set_load_frames(c, 0);
+    CHECK(card_load_frames(c) == 0 && call(c, 'A', 0xAC, 0, 0, 0, &nev, ev) == 1 && card_event_delay(c) == 2);
     card_free(c); remove(path);
     printf("card tests: %d checks, %d failures\n", checks, fails);
     free(ram);

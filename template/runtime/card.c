@@ -14,11 +14,13 @@ struct Card {
     unsigned gen;                                                        /* counts every change of the image: the player writes the file once the game has been quiet for a while (not only when the window closes) */
     char path[512];
     Fcb fcb[16];
-    int find_idx, find_deleted, last_error, status, auto_format, delay;     /* delay: frames the events of the last call wait (the reference BIOS moves one 128-byte sector per frame) */
+    int find_idx, find_deleted, last_error, status, auto_format, delay, load_frames;     /* delay: frames the events of the last call wait (the reference BIOS moves one 128-byte sector per frame) */
 };
 static void touch(Card *c) { c->dirty = 1; c->gen++; }
 unsigned card_gen(Card *c) { return c ? c->gen : 0; }
 int card_event_delay(Card *c) { return c ? c->delay : 0; }
+void card_set_load_frames(Card *c, int frames) { if (c) c->load_frames = frames > 0 ? frames : 0; }
+int card_load_frames(Card *c) { return c ? c->load_frames : 0; }
 
 static uint8_t xor_frame(const uint8_t *f) { uint8_t x = 0; for (int i = 0; i < 127; i++) x ^= f[i]; return x; }
 static void fix_dir(Card *c, int fr) { c->img[fr * FR + 127] = xor_frame(c->img + fr * FR); }
@@ -138,7 +140,7 @@ int card_call(Card *c, uint8_t *ram, char t, unsigned n, const uint32_t a[4], ui
         *ret = 1;
         if (!c->present) fail_nocard(c, ev, nev, HL);
         else if (!formatted(c)) { c->status = 0x21; evt(ev, nev, HL, 0x2000); }
-        else { done_ok(c, ev, nev, HL); evt(ev, nev, LL, 0x0004); c->delay = 2; }                 /* the reference BIOS ends a load with the SwCARD event and then the HwCARD one */
+        else { done_ok(c, ev, nev, HL); evt(ev, nev, LL, 0x0004); c->delay = c->load_frames ? c->load_frames : 2; }                 /* the reference BIOS ends a load with the SwCARD event and then the HwCARD one */
         return 1;
     }
     if (t == 'B' && (n == 0x4E || n == 0x4F)) {                                 /* write/read_card_sector(port, sector, buf) */

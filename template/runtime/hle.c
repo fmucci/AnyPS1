@@ -150,6 +150,7 @@ void rt_hle_set_card(const char *path) { g_card = card_new(path); }
 void rt_hle_card_set_path(const char *path) { card_set_path(g_card, path); }
 int rt_hle_card_save(void) { return card_save(g_card); }
 unsigned rt_hle_card_gen(void) { return card_gen(g_card); }
+void rt_hle_card_load_frames(int frames) { card_set_load_frames(g_card, frames); }
 const uint8_t *rt_hle_card_image(void) { return g_card ? card_image(g_card) : NULL; }
 
 static void ev_reset(void);
@@ -556,6 +557,9 @@ static void bios_dispatch(Cpu *c, char t, unsigned n) {
             { static int lg = -1; if (lg < 0) lg = getenv("PS1_CARDLOG") != NULL; if (lg) { fprintf(stderr, "[card] tick %u %c(%02X) a0=%08x a1=%08x a2=%08x a3=%08x -> %08x ev=%d", g_ticks, t, n, a[0], a[1], a[2], a[3], ret, nev); for (int k = 0; k < nev; k++) fprintf(stderr, " %08x/%04x", ev[k][0], ev[k][1]); fprintf(stderr, " ra=%08x\n", c->r[31]); } }   /* debug aid: every BIOS card call the program makes and what the card layer answered */
             c->r[2] = ret;
             for (int k = 0; k < nev && g_npend < 64; k++) { g_pend[g_npend][0] = ev[k][0]; g_pend[g_npend][1] = ev[k][1]; g_pend[g_npend][2] = (uint32_t)card_event_delay(g_card); g_npend++; }      /* _card_load takes 3 frames in the reference BIOS (3 sectors, one per frame); an async read or write one frame per 128-byte sector */   /* delivered at the next virtual frame */
+            if (t == 'A' && n == 0xAC && card_load_frames(g_card) > 0) {       /* a long _card_load: the HwCARD event fires every 2 frames while it reads, the SwCARD one and a last HwCARD one (already queued with the full delay) end it */
+                for (unsigned k = 0; k < (unsigned)card_load_frames(g_card) / 2 && g_npend < 64; k++) { g_pend[g_npend][0] = 0xF0000011u; g_pend[g_npend][1] = 4; g_pend[g_npend][2] = 2 * k; g_npend++; }
+            }
             return;
         }
     }

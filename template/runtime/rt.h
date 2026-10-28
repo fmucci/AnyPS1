@@ -101,6 +101,7 @@ void rt_pad_script_add(const char *spec);                     /* "cross+start@fi
 void rt_pad_set(uint32_t word);                               /* input provider: pad word as B(16h) returns it (pad 1 in the low halfword, active low); default 0xFFFFFFFF = no buttons */
 void rt_hle_set_card(const char *path);                      /* virtual memory card backing file (NULL = no card inserted) */
 int rt_hle_card_save(void);
+void rt_hle_card_load_frames(int frames);       /* how long _card_load takes (see card_set_load_frames); 0 = the short default */
 unsigned rt_hle_card_gen(void);                  /* changes whenever the virtual card image does */
 const uint8_t *rt_hle_card_image(void);
 uint8_t *rt_ram_ptr(Cpu *c);                                  /* host pointer to the 2 MiB guest RAM (HLE modules that DMA into guest memory) */

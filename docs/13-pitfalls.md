@@ -44,3 +44,7 @@ The virtual card was written when the player's window closed. A Windows console 
 
 ## A runner started without a memory card stops at the first card call (observed, second title)
 If the BIOS card layer is only created when a card path is given, a headless run without `--card` reaches `InitCard` (B(4Ah)) and stops with "not implemented", although the same build plays fine with a card. Create the layer always: no path = "no card in the slot" (status 0x11, the calls are answered, the program sees the no-card result). Check by running the plain command line from the README with no options but `--ticks`.
+
+## zsh does not split an unquoted variable: a press list in a variable passes ONE argument (observed)
+`R=$(grep -v '^#' route.txt); build/game DISC --ticks N $R` works in bash and silently passes the whole list as a single argument in zsh (the default shell on macOS): every `--press` is ignored, the run sits on the title or its attract movie and looks like a diverging build. Use `${=R}` in zsh, or `$(grep -v '^#' route.txt)` inline, or `bash -c`. A press list that "does nothing" in one front end and works in another is this before it is anything else: compare `ps`-visible argument counts (`printf '%s\n' $R | wc -l`) first.
+

@@ -377,6 +377,7 @@ static void ev_deliver(Cpu *c, uint32_t cls, uint32_t spec) {
     for (int i = 0; i < 16; i++) {
         Ev *e = &g_ev[i];
         if (e->used && e->status == 1 && e->cls == cls && e->spec == spec) {
+            if (getenv("PS1_EVLOG")) fprintf(stderr, "[ev] tick %u deliver cls %08x spec %04x mode %04x func %08x\n", g_ticks, cls, spec, e->mode, e->func);
             if (e->mode == 0x1000) { if (e->func) guest_call(c, e->func); }
             else e->status = 2;
         }
@@ -400,7 +401,7 @@ static void b_cd_remove(Cpu *c) { for (int i = 0; i < 5; i++) g_ev[i].used = 0; 
 static void b_close_event(Cpu *c) { Ev *e = ev_get(c->r[4]); if (e) e->used = 0; c->r[2] = 1; }
 static void b_enable_event(Cpu *c) { Ev *e = ev_get(c->r[4]); if (e) e->status = 1; c->r[2] = 1; }
 static void b_disable_event(Cpu *c) { Ev *e = ev_get(c->r[4]); if (e) e->status = 0; c->r[2] = 1; }
-static void b_test_event(Cpu *c) { Ev *e = ev_get(c->r[4]); if (e && e->status == 2) { e->status = 1; c->r[2] = 1; } else c->r[2] = 0; }
+static void b_test_event(Cpu *c) { Ev *e = ev_get(c->r[4]); if (e && e->status == 2) { e->status = 1; c->r[2] = 1; } else c->r[2] = 0; if (getenv("PS1_EVLOG")) fprintf(stderr, "[ev] tick %u TestEvent(%08x) cls %08x spec %04x status %d -> %u ra=%08x\n", g_ticks, c->r[4], e ? e->cls : 0, e ? e->spec : 0, e ? e->status : -1, c->r[2], c->r[31]); }
 static void b_wait_event(Cpu *c) {
     uint32_t h = c->r[4];
     Ev *e = ev_get(h);
@@ -546,11 +547,13 @@ static void bios_dispatch(Cpu *c, char t, unsigned n) {
         c->r[2] = 1;
         return;
     }
+    { static int bl = -1; if (bl < 0) bl = getenv("PS1_BIOSLOG") != NULL; if (bl && !(t == 'B' && (n == 0x0B || n == 0x0A))) fprintf(stderr, "[bios] tick %u %c(%02X) a0=%08x a1=%08x a2=%08x a3=%08x ra=%08x\n", g_ticks, t, n, c->r[4], c->r[5], c->r[6], c->r[7], c->r[31]); }   /* debug aid: every BIOS call that reaches the dispatcher (TestEvent/WaitEvent excluded: PS1_EVLOG) */
     if (!(t == 'B' && n == 0x35 && c->r[4] == 1) && g_card) {      /* memory-card layer (runtime/card.c) */
         uint32_t a[4] = {c->r[4], c->r[5], c->r[6], c->r[7]}, ret, ev[8][2];
         int nev;
         uint8_t *ram = rt_ram_ptr(c);
         if (card_call(g_card, ram, t, n, a, &ret, ev, &nev)) {
+            { static int lg = -1; if (lg < 0) lg = getenv("PS1_CARDLOG") != NULL; if (lg) { fprintf(stderr, "[card] tick %u %c(%02X) a0=%08x a1=%08x a2=%08x a3=%08x -> %08x ev=%d", g_ticks, t, n, a[0], a[1], a[2], a[3], ret, nev); for (int k = 0; k < nev; k++) fprintf(stderr, " %08x/%04x", ev[k][0], ev[k][1]); fprintf(stderr, " ra=%08x\n", c->r[31]); } }   /* debug aid: every BIOS card call the program makes and what the card layer answered */
             c->r[2] = ret;
             for (int k = 0; k < nev && g_npend < 64; k++) { g_pend[g_npend][0] = ev[k][0]; g_pend[g_npend][1] = ev[k][1]; g_pend[g_npend][2] = (uint32_t)card_event_delay(g_card); g_npend++; }      /* _card_load takes 3 frames in the reference BIOS (3 sectors, one per frame); an async read or write one frame per 128-byte sector */   /* delivered at the next virtual frame */
             return;

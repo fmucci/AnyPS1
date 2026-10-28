@@ -23,7 +23,7 @@ static int game_boot(Cpu *c, const char *disc, const char *card, const char *tra
     if (trace) rt_trace_open(trace);
     if (!rt_hle_init(disc)) return 1;
     rt_io_attach_hw(c);
-    if (card) rt_hle_set_card(card);
+    rt_hle_set_card(card);                                  /* NULL = no card in the slot (card_new): the BIOS card calls are still answered, with "no card"; without this they were unimplemented stops */
     rt_hle_set_chain(1);
     game_overlays();
     game_link_modules();

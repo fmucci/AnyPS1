@@ -3,7 +3,8 @@
    python3 -I tools/package.py windows     cross build with MinGW-w64 in the Docker image (docker/windows), output dist/@NAME@-windows-x64/ and .zip
    python3 -I tools/package.py linux       build in the Docker image (docker/linux), output dist/@NAME@-linux-<arch>/ (needs libsdl2-2.0-0 on the target)
    python3 -I tools/package.py native      build with the host compiler, output dist/@NAME@-<os>-<arch>/
-   add `--with-disc PATH` to also include your own disc image in the zip (a single file to move to another machine; never publish it)
+   add `--with-disc PATH` to also include your own disc in the zip (never publish it): a .bin is unpacked into loose files (tools/disc_unpack.py, standalone) and shipped as the
+   folder disc/ (the player and the scripts take a .bin or such a folder); a folder made by disc_unpack.py is shipped as is
 The package contains **code recompiled from the game's executables** (generated from the disc image in og-files/ on THIS machine). It is for the owner's own
 testing: it is git-ignored (dist/) and must not be published or shared. The disc image itself is never included: the player takes the path of the user's own .bin."""
 import os
@@ -11,6 +12,7 @@ import platform
 import shutil
 import subprocess
 import sys
+import tempfile
 import zipfile
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -25,7 +27,7 @@ README = """@NAME@ - native port of @TITLE@ (test build)
 You need your own disc image of the game (the .bin file of a single-track .bin/.cue).  Nothing of the game is included here except program code
 recompiled from it; do not share this folder.
 
-Run:   play.bat      (uses "@DISC@" from this folder when present; otherwise pass the path: play.bat "C:\\path\\to\\@DISC@", or drag the .bin onto play.bat)
+Run:   play.bat      (uses the folder "disc" or "@DISC@" from this folder when present; otherwise pass the path: play.bat "C:\\path\\to\\@DISC@", or drag the .bin onto play.bat)
 Keys:  arrows = d-pad, Z = cross, X = circle, A = square, S = triangle, Q/W = L1/R1, E/R = L2/R2, Enter = start, Right Shift = select,
        F11 = fullscreen, Esc = quit, hold Tab = fast forward, F12 = screenshot (logs/).  Game controllers work too.
 Saves: @NAME@.mcr in this folder (a virtual memory card); written a few seconds after the game saves and again when you quit.\nLogs:  logs/session-*.rec (your pad input), .log (console) and .start-*.mcr (the card you started with): send them with a report, they let us replay your session.
@@ -37,10 +39,12 @@ PLAY_BAT = """@echo off
 cd /d "%~dp0"
 if not "%~1"=="" (
   set DISC=%~1
+) else if exist "disc\\disc.map" (
+  set DISC=disc
 ) else if exist "@DISC@" (
   set DISC=@DISC@
 ) else (
-  set /p DISC=Path to the game's .bin file: 
+  set /p DISC=Path to the game's .bin file (or an unpacked disc folder): 
 )
 if not exist logs mkdir logs
 for /f %%i in ('powershell -nologo -noprofile -command "Get-Date -Format yyyyMMdd-HHmmss"') do set TS=%%i
@@ -99,6 +103,13 @@ def main():
         disc = sys.argv[sys.argv.index("--with-disc") + 1]
         args = [a for a in args if a != disc]
     what = args[0] if args else "native"
+    tmp_disc = None
+    if disc and os.path.isfile(disc):                          # a .bin: unpack it (standalone) so the zip carries loose files, not the image
+        tmp_disc = tempfile.mkdtemp()
+        subprocess.run([sys.executable, "-I", os.path.join(ROOT, "tools", "disc_unpack.py"), "--standalone", tmp_disc, disc], check=True, stdout=subprocess.DEVNULL)
+        disc = os.path.join(tmp_disc, "d1")
+    elif disc and not os.path.exists(os.path.join(disc, "disc.map")):
+        sys.exit("--with-disc: %s is neither a .bin nor a folder with disc.map" % disc)
     src, name = windows() if what == "windows" else linux() if what == "linux" else native()
     dist = os.path.join(ROOT, "dist", name)
     keep = {"logs"}                                            # the player's own files (sessions, saves, the disc link) survive a rebuild
@@ -107,12 +118,12 @@ def main():
             if fn in keep or fn.endswith((".mcr", ".bin")): continue
             fp = os.path.join(dist, fn); shutil.rmtree(fp) if os.path.isdir(fp) and not os.path.islink(fp) else os.remove(fp)
     shutil.copytree(src, dist, dirs_exist_ok=True)
-    open(os.path.join(dist, "README.txt"), "w", newline="\r\n" if what == "windows" else "\n").write(fill(README if what == "windows" else README.replace("play.bat      (uses \"@DISC@\" from this folder when present; otherwise pass the path: play.bat \"C:\\path\\to\\@DISC@\", or drag the .bin onto play.bat)", "./play.sh   (uses \"@DISC@\" from this folder when present, or ./play.sh \"/path/to/@DISC@\"; Linux needs the SDL2 runtime: libsdl2-2.0-0)")))
+    open(os.path.join(dist, "README.txt"), "w", newline="\r\n" if what == "windows" else "\n").write(fill(README if what == "windows" else README.replace("play.bat      (uses the folder \"disc\" or \"@DISC@\" from this folder when present; otherwise pass the path: play.bat \"C:\\path\\to\\@DISC@\", or drag the .bin onto play.bat)", "./play.sh   (uses the folder \"disc\" or \"@DISC@\" from this folder when present, or ./play.sh \"/path/to/@DISC@\"; Linux needs the SDL2 runtime: libsdl2-2.0-0)")))
     if what == "windows":
         open(os.path.join(dist, "play.bat"), "w", newline="\r\n").write(fill(PLAY_BAT))
     else:
         sh = os.path.join(dist, "play.sh")
-        open(sh, "w").write('#!/bin/sh\ncd "$(dirname "$0")"\nDISC="${1:-' + DISCNAME + '}"\nmkdir -p logs\nTS=$(date +%Y%m%d-%H%M%S)\n# the card the session starts with (the player rewrites it a few seconds after the game saves): needed to replay the session later\nfor C in *.mcr; do [ -f "$C" ] && cp "$C" "logs/session-$TS.start-$C"; done\n# every session: logs/session-TS.rec = the pad input (see rec2press.py), logs/session-TS.log = the console output\n./ps1_play "$DISC" --record "logs/session-$TS.rec" 2>&1 | tee "logs/session-$TS.log"\n')
+        open(sh, "w").write('#!/bin/sh\ncd "$(dirname "$0")"\nDISC="$1"\n[ -z "$DISC" ] && { if [ -f disc/disc.map ]; then DISC=disc; else DISC=' + DISCNAME + '; fi; }\nmkdir -p logs\nTS=$(date +%Y%m%d-%H%M%S)\n# the card the session starts with (the player rewrites it a few seconds after the game saves): needed to replay the session later\nfor C in *.mcr; do [ -f "$C" ] && cp "$C" "logs/session-$TS.start-$C"; done\n# every session: logs/session-TS.rec = the pad input (see rec2press.py), logs/session-TS.log = the console output\n./ps1_play "$DISC" --record "logs/session-$TS.rec" 2>&1 | tee "logs/session-$TS.log"\n')
         os.chmod(sh, 0o755)
     shutil.copy(os.path.join(ROOT, "tools", "ref_emu", "rec2press.py"), os.path.join(dist, "rec2press.py"))
     zpath = dist + ("-with-disc" if disc else "") + ".zip"
@@ -121,7 +132,11 @@ def main():
             if fn == "logs" or fn.endswith((".mcr", ".bin")): continue          # the player's own files and the disc never go into the zip (the disc only with --with-disc)
             z.write(os.path.join(dist, fn), os.path.join(name, fn))
         if disc:                                               # the disc is mostly compressed video: store it as is
-            z.write(disc, os.path.join(name, DISCNAME), compress_type=zipfile.ZIP_STORED)
+            for root, _d, files in os.walk(disc):
+                for fn in sorted(files):
+                    fp = os.path.join(root, fn)
+                    z.write(fp, os.path.join(name, "disc", os.path.relpath(fp, disc)), compress_type=zipfile.ZIP_STORED)
+    if tmp_disc: shutil.rmtree(tmp_disc, ignore_errors=True)
     print("package:", dist)
     print("zip:    ", zpath, "(%.1f MB)" % (os.path.getsize(zpath) / 1e6))
 

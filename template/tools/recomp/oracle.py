@@ -33,7 +33,7 @@ import hostenv  # noqa: E402
 def load_io_lib():
     """Builds (if needed) and loads runtime/io.c as a shared library: the register model is written once, in C, and used by both executors."""
     out = os.path.join(_ROOT, "build", "libps1io" + hostenv.shlib_ext())
-    src = [os.path.join(_ROOT, "runtime", "io.c"), os.path.join(_ROOT, "runtime", "io.h"), os.path.join(_ROOT, "runtime", "gte.c"), os.path.join(_ROOT, "runtime", "gte.h"), os.path.join(_ROOT, "runtime", "card.c"), os.path.join(_ROOT, "runtime", "card.h")]
+    src = [os.path.join(_ROOT, "runtime", "io.c"), os.path.join(_ROOT, "runtime", "io.h"), os.path.join(_ROOT, "runtime", "gte.c"), os.path.join(_ROOT, "runtime", "gte.h"), os.path.join(_ROOT, "runtime", "card.c"), os.path.join(_ROOT, "runtime", "card.h"), os.path.join(_ROOT, "runtime", "sectors.c")]
     if not os.path.exists(out) or os.path.getmtime(out) < max(os.path.getmtime(p) for p in src):
         os.makedirs(os.path.dirname(out), exist_ok=True)
         subprocess.run([hostenv.CC, "-std=gnu11", "-O1", "-shared", "-fPIC", "-I", os.path.join(_ROOT, "runtime"), src[0], src[2], src[4], os.path.join(_ROOT, "runtime", "cov_stub.c"), "-o", out], check=True)

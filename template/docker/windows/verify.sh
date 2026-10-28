@@ -12,7 +12,7 @@ for t in test_hw test_card; do
   $CC -Wall -Wextra -Werror -std=gnu11 -O1 -Iruntime $src $extra -o build/$t.exe
   $WINE build/$t.exe 2>&1 | tail -1
 done
-$CC -Wall -Wextra -Werror -std=gnu11 -O1 -Iruntime tests/runtime/test_rt.c runtime/mem.c runtime/sys.c runtime/dispatch.c runtime/interp.c runtime/trace.c runtime/io.c runtime/gte.c runtime/card.c -o build/test_rt.exe
+$CC -Wall -Wextra -Werror -std=gnu11 -O1 -Iruntime tests/runtime/test_rt.c runtime/mem.c runtime/sys.c runtime/dispatch.c runtime/interp.c runtime/trace.c runtime/io.c runtime/sectors.c runtime/gte.c runtime/card.c -o build/test_rt.exe
 $WINE build/test_rt.exe 2>&1 | tail -1
 echo "== SDL2 (MinGW development package)"
 if [ ! -d /opt/SDL2 ]; then

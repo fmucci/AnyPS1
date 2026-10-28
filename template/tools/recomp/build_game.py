@@ -86,7 +86,7 @@ def main():
     obj = ovc[:-2] + ".o"
     subprocess.run([hostenv.CC, "-std=gnu11", opt, "-w"] + inc + ["-c", ovc, "-o", obj], check=True)
     objs.append(obj)
-    rt = [os.path.join(ROOT, "runtime", f) for f in ("mem.c", "sys.c", "dispatch.c", "disc.c", "trace.c", "hle.c", "io.c", "gte.c", "card.c", "interp.c")]
+    rt = [os.path.join(ROOT, "runtime", f) for f in ("mem.c", "sys.c", "dispatch.c", "disc.c", "sectors.c", "trace.c", "hle.c", "io.c", "gte.c", "card.c", "interp.c")]
     subprocess.run([hostenv.CC, "-std=gnu11", opt, "-w"] + extra + inc + [os.path.join(ROOT, "tests/runtime/run_game.c")] + rt + objs +
                    ["-o", os.path.join(ROOT, "build", hostenv.exe(OUT))], check=True)
     print("built build/%s" % OUT)

@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "io.h"
+#include "sectors.h"
 #include "rt.h"
 
 #define VW 1024
@@ -19,7 +20,7 @@ typedef struct {
 #define CDQ 16
 typedef struct { unsigned due; int type; int n; uint8_t b[16]; int sector; } CdEv;
 typedef struct {
-    FILE *f; char path[1024];
+    Sectors *s; char path[1024];
     int index, irq_en, irq_fl, mode, motor, reading, filt_file, filt_ch, adpmute;
     uint8_t param[16]; int nparam;
     uint8_t resp[16]; int nresp, presp;
@@ -130,8 +131,8 @@ static int unbcd(int v) { return (v >> 4) * 10 + (v & 15); }
 static void cd_read_sector(IoCtx *x) {                  /* load the sector at cur into the host buffer; returns with sec_valid = 0 on failure */
     Cd *c = &x->cd;
     c->sec_valid = 0;
-    if (!c->f || c->cur < 0) return;
-    if (fseek(c->f, (long)c->cur * 2352, SEEK_SET) != 0 || fread(c->sec, 1, 2352, c->f) != 2352) return;
+    if (!c->s || c->cur < 0) return;
+    if (!sec_read(c->s, (uint32_t)c->cur, c->sec)) return;
     memcpy(c->hdr, c->sec + 12, 8);                      /* header (mm ss ff mode) + first 4 subheader bytes */
     c->sec_valid = 1;
 }
@@ -256,8 +257,8 @@ static int cd_fire(IoCtx *x) {
     return 1;
 }
 
-int io_cd_open(IoCtx *x, const char *path) { snprintf(x->cd.path, sizeof x->cd.path, "%s", path); x->cd.f = fopen(path, "rb"); return x->cd.f != NULL; }
-int io_cd_reopen(IoCtx *x) { if (x->cd.f) fclose(x->cd.f); x->cd.f = fopen(x->cd.path, "rb"); return x->cd.f != NULL; }      /* a forked child must not share the open file description (and offset) of its siblings */
+int io_cd_open(IoCtx *x, const char *path) { snprintf(x->cd.path, sizeof x->cd.path, "%s", path); x->cd.s = sec_open(path); return x->cd.s != NULL; }
+int io_cd_reopen(IoCtx *x) { if (x->cd.s) sec_reopen(x->cd.s); return x->cd.s != NULL; }      /* a forked child must not share the open file description (and offset) of its siblings */
 static void dicr_update(IoCtx *x, int ch);
 int io_cd_step(IoCtx *x) { return cd_fire(x); }
 /* DMA completion interrupts: a transfer is instantaneous in this model, but its interrupt must not be visible inside the interrupt handler that started it (a handler that restarts the

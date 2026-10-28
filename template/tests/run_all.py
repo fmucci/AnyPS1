@@ -56,7 +56,7 @@ def main():
         run(PY + ["tools/recomp/unresolved_pointers.py", "--check"] + [os.path.join(game.DISC_DIR, n) for n, _p in game.EXES])
     # runtime unit tests: UBSan only where the compiler supports it (ASan deadlocks in its own init on the macOS toolchain used so far, ai-rules/05 pitfall 15)
     san = ["-fsanitize=undefined"] if sys.platform != "win32" else []
-    rt = ["runtime/mem.c", "runtime/sys.c", "runtime/dispatch.c", "runtime/trace.c", "runtime/interp.c"]
+    rt = ["runtime/mem.c", "runtime/sys.c", "runtime/dispatch.c", "runtime/trace.c", "runtime/interp.c", "runtime/sectors.c"]
     tests = [("test_interp", ["tests/runtime/test_interp.c"] + rt + ["runtime/io.c", "runtime/gte.c", "runtime/card.c"]),
              ("test_rt", ["tests/runtime/test_rt.c"] + rt + ["runtime/io.c", "runtime/gte.c", "runtime/card.c"]),
              ("test_card", ["tests/runtime/test_card.c", "runtime/card.c"]),
@@ -71,6 +71,7 @@ def main():
         run(PY + ["tools/ps1_tests.py", "--expect", "100", "gpu/clipping", "gpu/clut-cache", "gpu/quad", "gpu/rectangles", "gpu/texture-flip", "gpu/texture-overflow", "gpu/transparency", "gpu/triangle", "gpu/uv-interpolation", "gpu/vram-to-vram-overlap"])
     if os.path.isdir(os.path.join(ROOT, "work", "refs", "ps1-tests-bin")) and os.path.isdir(os.path.join(ROOT, "work", "refs", "ps1-tests")) and game is not None and os.path.exists(game.DISC):
         run(PY + ["tools/ps1_tests.py", "--no-fails", "dma/otc-test", "gpu/gp0-e1", "gpu/mask-bit"])          # self-checking programs: no `fail -` line
+    run(PY + ["tests/runtime/test_unpack.py"])               # disc_unpack.py + runtime/sectors.c on synthetic discs (cooked, shared and raw extents)
     run(PY + ["tests/gte/test_gte_ref.py"])                # GTE against the independent reference (skips unless tools/gte_ref/build_ref.py was run)
     print("ALL RECOMP TESTS PASSED")
 

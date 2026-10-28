@@ -80,6 +80,9 @@ def main():
     disc_dir = os.path.join(ROOT, "og-files", "disc")
     if not os.path.exists(os.path.join(disc_dir, "SYSTEM.CNF")):
         subprocess.run([sys.executable, "-I", os.path.join(ROOT, "tools", "iso_extract.py"), dst, disc_dir], check=True, stdout=subprocess.DEVNULL)
+    unp = os.path.join(ROOT, "og-files", "unpacked")              # the disc as loose files + disc.map: every program takes this folder instead of the .bin (docs/findings, tools/disc_unpack.py)
+    if not os.path.exists(os.path.join(unp, "d1", "disc.map")):
+        subprocess.run([sys.executable, "-I", os.path.join(ROOT, "tools", "disc_unpack.py"), unp, dst], check=True, stdout=subprocess.DEVNULL)
     cnf = open(os.path.join(disc_dir, "SYSTEM.CNF"), errors="replace").read()
     m = re.search(r"BOOT\s*=\s*cdrom:\\?([^;\s]+)", cnf, re.I)
     if not m:

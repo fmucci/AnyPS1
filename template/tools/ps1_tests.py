@@ -119,7 +119,7 @@ def run_one(test, ticks, keep):
         subprocess.run([sys.executable, "-I", os.path.join(ROOT, "tools/recomp/gen.py"), exe, gen, "--prefix", "pt", "--auto-roots"], check=True, capture_output=True)
         run = os.path.join(t, hostenv.exe("run"))
         subprocess.run([hostenv.CC, "-std=gnu11", "-O1", "-w", "-I", os.path.join(ROOT, "runtime"), "-DGEN_REGISTER=gen_register_pt", "-DGEN_HOOKS=gen_hooks_pt", "-DGEN_CODE=gen_code_pt",
-                        gen, os.path.join(ROOT, "tests/runtime/run_exe.c")] + [os.path.join(ROOT, "runtime", f) for f in ("mem.c", "sys.c", "dispatch.c", "interp.c", "disc.c", "trace.c", "hle.c", "io.c", "gte.c", "card.c")] + ["-o", run], check=True)
+                        gen, os.path.join(ROOT, "tests/runtime/run_exe.c")] + [os.path.join(ROOT, "runtime", f) for f in ("mem.c", "sys.c", "dispatch.c", "interp.c", "disc.c", "sectors.c", "trace.c", "hle.c", "io.c", "gte.c", "card.c")] + ["-o", run], check=True)
         ppm = os.path.join(t, "vram.ppm")
         env = dict(os.environ, PS1_DEFAULT_SP="1", PS1_MAX_TICKS=str(ticks), PS1_PPM=ppm, PS1_CARD=os.path.join(t, "c.mcr"))
         r = subprocess.run([run, DISC, exe, os.path.join(t, "trace.txt")], capture_output=True, env=env, timeout=600)

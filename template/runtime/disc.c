@@ -3,8 +3,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include "disc.h"
+#include "sectors.h"
 
-struct RtDisc { FILE *f; char path[1024]; uint32_t root_lba, root_size; };
+struct RtDisc { Sectors *f; char path[1024]; uint32_t root_lba, root_size; };
 #define FRAME 2352
 #define HDR 24
 
@@ -13,7 +14,7 @@ static uint32_t le32(const uint8_t *p) { return p[0] | (p[1] << 8) | (p[2] << 16
 int rt_disc_read(RtDisc *d, uint32_t lba, uint32_t n, uint8_t *dst) {
     uint8_t raw[FRAME];
     for (uint32_t k = 0; k < n; k++) {
-        if (fseek(d->f, (long)(lba + k) * FRAME, SEEK_SET) != 0 || fread(raw, 1, FRAME, d->f) != FRAME) return 0;
+        if (!sec_read(d->f, lba + k, raw)) return 0;
         memcpy(dst + (size_t)k * 2048, raw + HDR, 2048);
     }
     return 1;
@@ -23,15 +24,15 @@ RtDisc *rt_disc_open(const char *path) {
     RtDisc *d = calloc(1, sizeof *d);
     if (!d) return NULL;
     snprintf(d->path, sizeof d->path, "%s", path);
-    d->f = fopen(path, "rb");
+    d->f = sec_open(path);
     uint8_t pvd[2048];
     if (!d->f || !rt_disc_read(d, 16, 1, pvd) || memcmp(pvd + 1, "CD001", 5) != 0) { rt_disc_close(d); return NULL; }
     d->root_lba = le32(pvd + 156 + 2);
     d->root_size = le32(pvd + 156 + 10);
     return d;
 }
-void rt_disc_reopen(RtDisc *d) { if (d && d->f) { fclose(d->f); d->f = fopen(d->path, "rb"); } }
-void rt_disc_close(RtDisc *d) { if (d) { if (d->f) fclose(d->f); free(d); } }
+void rt_disc_reopen(RtDisc *d) { if (d && d->f) sec_reopen(d->f); }
+void rt_disc_close(RtDisc *d) { if (d) { if (d->f) sec_close(d->f); free(d); } }
 
 static int upper_eq(const char *a, size_t na, const char *b, size_t nb) {
     if (na != nb) return 0;

@@ -8,6 +8,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include "io.h"
 #include "rt.h"
 
@@ -117,10 +118,35 @@ static void tick_hook(Cpu *c, void *ud) {
       if (h->rec && w != h->last_word) { fprintf(h->rec, "%u %08x\n", rt_hle_ticks() + 1, w); fflush(h->rec); h->last_word = w; } }       /* recorded for the NEXT frame (replay applies it from that tick on) */
 }
 
+#ifdef _WIN32
+#include <windows.h>
+static LONG WINAPI crash_filter(EXCEPTION_POINTERS *e) { fprintf(stderr, "[play] CRASH: exception %08lx at %p\n", e->ExceptionRecord->ExceptionCode, e->ExceptionRecord->ExceptionAddress); fflush(stderr); return EXCEPTION_EXECUTE_HANDLER; }
+#endif
+static void fail_box(const char *what, const char *detail) {          /* the console output goes to logs/session-*.log, so a failure at start-up must be visible some other way */
+    fprintf(stderr, "[play] %s: %s\n", what, detail ? detail : "");
+    char msg[1400]; snprintf(msg, sizeof msg, "%s:\n%s\n\nDetails are in the logs folder.", what, detail ? detail : "");
+    SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, GAME_TITLE, msg, NULL);
+}
+
 int main(int argc, char **argv) {
-    if (argc < 2) { fprintf(stderr, "usage: ps1_play DISC.bin [--card FILE] [--scale N] [--fullscreen] [--no-sync] [--ticks N]\n"); return 2; }
+    static char dflt[3][64]; char *av[3]; FILE *rec0 = NULL;
+    if (argc < 2) {                                                     /* started by double-clicking the .exe (not through play.bat): find the disc next to it, keep the logs ourselves */
+#ifdef _WIN32
+        SetUnhandledExceptionFilter(crash_filter);                      /* a crash leaves a line in the log instead of a silently closing window */
+        char exe[MAX_PATH]; DWORD n = GetModuleFileNameA(NULL, exe, MAX_PATH);
+        if (n > 0 && n < MAX_PATH) { char *sl = strrchr(exe, '\\'); if (sl) { *sl = 0; SetCurrentDirectoryA(exe); } }
+        CreateDirectoryA("logs", NULL);
+#endif
+        time_t t = time(NULL); struct tm *tm = localtime(&t); char fn[96];
+        strftime(fn, sizeof fn, "logs/session-%Y%m%d-%H%M%S.log", tm); freopen(fn, "w", stderr);
+        strftime(fn, sizeof fn, "logs/session-%Y%m%d-%H%M%S.rec", tm); rec0 = fopen(fn, "w");
+        FILE *probe = fopen("disc/disc.map", "r");
+        snprintf(dflt[0], sizeof dflt[0], "ps1_play"); snprintf(dflt[1], sizeof dflt[1], "%s", probe ? "disc" : "game.bin"); if (probe) fclose(probe);
+        av[0] = dflt[0]; av[1] = dflt[1]; argv = av; argc = 2;
+        fprintf(stderr, "[play] started without arguments: disc = %s\n", dflt[1]); fflush(stderr);
+    }
     const char *card = GAME_CARD_FILE;
-    int scale = 2, fullscreen = 0, sync = 1; unsigned ticks = 0; FILE *rec = NULL; int scripted = 0;
+    int scale = 2, fullscreen = 0, sync = 1; unsigned ticks = 0; FILE *rec = rec0; int scripted = 0;
     for (int i = 2; i < argc; i++) {
         if (!strcmp(argv[i], "--card") && i + 1 < argc) card = argv[++i];
         else if (!strcmp(argv[i], "--scale") && i + 1 < argc) scale = atoi(argv[++i]);
@@ -130,13 +156,19 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--press") && i + 1 < argc) { rt_pad_script_add(argv[++i]); scripted = 1; }       /* scripted input (as run_game): the keyboard is then ignored */
         else if (!strcmp(argv[i], "--ticks") && i + 1 < argc) ticks = (unsigned)atoi(argv[++i]);
     }
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMECONTROLLER) != 0) { fprintf(stderr, "SDL: %s\n", SDL_GetError()); return 1; }
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMECONTROLLER) != 0) {          /* a machine without audio or game controller support (a remote desktop, a VM): retry with video only */
+        fprintf(stderr, "SDL (video+audio+controller): %s\n", SDL_GetError());
+        if (SDL_Init(SDL_INIT_VIDEO) != 0) { fail_box("SDL could not start", SDL_GetError()); return 1; }
+    }
     Host h; memset(&h, 0, sizeof h);
     h.sync = sync; g_scripted = scripted; h.fullscreen = fullscreen; h.rec = rec; h.last_word = 0xFFFFFFFFu;
     h.rgb = malloc(1024 * 512 * 3);
     h.win = SDL_CreateWindow(GAME_TITLE, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 320 * scale, 240 * scale, SDL_WINDOW_RESIZABLE | (fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0));
+    if (!h.win) { fail_box("could not create the window", SDL_GetError()); return 1; }
     h.ren = SDL_CreateRenderer(h.win, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
-    if (!h.ren) h.ren = SDL_CreateRenderer(h.win, -1, 0);
+    if (!h.ren) { fprintf(stderr, "[play] accelerated renderer: %s\n", SDL_GetError()); h.ren = SDL_CreateRenderer(h.win, -1, 0); }
+    if (!h.ren) { fprintf(stderr, "[play] default renderer: %s\n", SDL_GetError()); h.ren = SDL_CreateRenderer(h.win, -1, SDL_RENDERER_SOFTWARE); }       /* remote desktop sessions often have no GPU */
+    if (!h.ren) { fail_box("could not create a renderer", SDL_GetError()); return 1; }
     SDL_RenderSetLogicalSize(h.ren, 320, 240);
     SDL_AudioSpec want, have; SDL_zero(want);
     want.freq = 44100; want.format = AUDIO_S16SYS; want.channels = 2; want.samples = 1024;
@@ -146,11 +178,11 @@ int main(int argc, char **argv) {
     h.t0 = SDL_GetPerformanceCounter();
     Cpu cpu, *c = &cpu;
     uint32_t entry;
-    if (game_boot(c, argv[1], card, NULL, &entry)) { fprintf(stderr, "cannot open disc image\n"); return 2; }
+    if (game_boot(c, argv[1], card, NULL, &entry)) { fprintf(stderr, "cannot open disc image\n"); fail_box("cannot open the disc", argv[1]); return 2; }
     rt_set_tick_hook(tick_hook, &h);
     rt_set_fatal_handler(on_fatal);
     if (ticks) rt_set_max_ticks(ticks);
-    if (setjmp(g_jb)) { fprintf(stderr, "%s\n", g_msg); rt_hle_card_save(); SDL_Quit(); return 1; }
+    if (setjmp(g_jb)) { fprintf(stderr, "%s\n", g_msg); rt_hle_card_save(); fail_box("the game stopped", g_msg); SDL_Quit(); return 1; }
     rt_run_entry(c, entry);
     rt_hle_card_save();
     SDL_Quit();

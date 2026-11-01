@@ -55,3 +55,4 @@
 - 2026-10-28 · 11: `_card_load` timing and HwCARD event pattern decide whether a menu accepts the card (first title: 72 frames, HwCARD every 2); template `card_set_load_frames` / `rt_hle_card_load_frames`; method for measuring card behaviour in the reference
 - 2026-11-01 · `runtime/sectors.c`: files opened on first read + retry + `_setmaxstdio(2048)` + 64-bit seeks (a 397-file disc folder did not open on Windows: 512 open-file limit); 13: pitfall
 - 2026-11-01 · `package.py` play.bat: a `)` in the set /p prompt inside an if-block was a batch syntax error (script ended, no logs); removed, timestamp fallback; pitfall in 13
+- 2026-11-01 · template `frontend/ps1_play.c`: runs by double-click (own logs/, disc/ next to it), message boxes for start-up failures, renderer fallback to software, crash line in the log; 13: pitfall

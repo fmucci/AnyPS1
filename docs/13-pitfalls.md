@@ -53,3 +53,6 @@ If the sector reader keeps one `FILE*` per file open and the program opens the d
 
 ## A `)` inside an `if ( ... )` block of a .bat ends the script silently (observed, third title)
 `set /p X=Path (or folder): ` inside a parenthesised block closes the block at the `)`: a syntax error before the first command, the double-clicked window flashes and closes and no `logs` folder is created. Keep text out of parentheses in blocks (or escape `^)`) and test the packaged .bat with `wine cmd /c play.bat` in `docker/windows` before shipping.
+
+## A player that only logs through a wrapper script fails silently when started directly (observed, third title)
+If the console output goes to a file only because `play.bat` redirects it, a double-clicked `.exe`, a remote desktop session without GPU/audio, or a crash shows a window that flashes and closes and leaves no evidence. Let the player do it: no arguments = its own folder, `disc/` next to it, its own `logs/`; message boxes (`SDL_ShowSimpleMessageBox`) for start-up failures; SDL init video-only fallback; renderer fallback accelerated -> default -> software; `SetUnhandledExceptionFilter` writing the exception code to the log. Template `frontend/ps1_play.c` has all of it.

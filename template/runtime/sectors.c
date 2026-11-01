@@ -2,6 +2,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#ifdef _WIN32
+#define SEEK64(f, o) _fseeki64((f), (long long)(o), SEEK_SET)
+#else
+#define SEEK64(f, o) fseeko((f), (off_t)(o), SEEK_SET)
+#endif
 #include "sectors.h"
 
 #define FRAME 2352
@@ -51,7 +56,10 @@ Sectors *sec_open(const char *path) {
         Ext x = {0}; x.kind = 'r'; x.lba = 0; x.n = (uint32_t)(st.st_size / FRAME);
         if ((x.file = file_index(s, path)) < 0 || !add(s, x)) { sec_close(s); return NULL; }
     }
-    for (int i = 0; i < s->nf; i++) { s->fp[i] = fopen(s->names[i], "rb"); if (!s->fp[i]) { sec_close(s); return NULL; } }   /* fail early on a missing file */
+#ifdef _WIN32
+    _setmaxstdio(2048);                                              /* the C runtime allows 512 open files by default: a disc folder has ~400 files and the program opens the disc twice */
+#endif
+    for (int i = 0; i < s->nf; i++) { FILE *t = fopen(s->names[i], "rb"); if (!t) { sec_close(s); return NULL; } fclose(t); }   /* fail early on a missing file; files are opened when first read */
     return s;
 }
 void sec_reopen(Sectors *s) { if (s) for (int i = 0; i < s->nf; i++) if (s->fp[i]) { fclose(s->fp[i]); s->fp[i] = NULL; } }
@@ -64,15 +72,18 @@ int sec_read(Sectors *s, uint32_t lba, uint8_t out[FRAME]) {
     const Ext *x = &s->e[lo];
     if (lba < x->lba || lba >= x->lba + x->n) return 0;
     FILE **fp = &s->fp[x->file];
-    if (!*fp && !(*fp = fopen(s->names[x->file], "rb"))) return 0;
+    if (!*fp && !(*fp = fopen(s->names[x->file], "rb"))) {         /* out of file handles: drop this reader's other files and retry */
+        sec_reopen(s);
+        if (!(*fp = fopen(s->names[x->file], "rb"))) return 0;
+    }
     uint32_t k = lba - x->lba;
-    if (x->kind == 'r') return fseek(*fp, (long)((uint64_t)k * FRAME), SEEK_SET) == 0 && fread(out, 1, FRAME, *fp) == FRAME;
+    if (x->kind == 'r') return SEEK64(*fp, (uint64_t)k * FRAME) == 0 && fread(out, 1, FRAME, *fp) == FRAME;
     memset(out, 0, FRAME);
     memset(out + 1, 0xFF, 10);
     int a = (int)lba + 150;
     out[12] = (uint8_t)bcd(a / 4500); out[13] = (uint8_t)bcd((a / 75) % 60); out[14] = (uint8_t)bcd(a % 75); out[15] = 2;
     memcpy(out + 16, x->sh, 8);
-    if (fseek(*fp, (long)((uint64_t)(x->fsec + k) * 2048), SEEK_SET) != 0) return 0;
+    if (SEEK64(*fp, (uint64_t)(x->fsec + k) * 2048) != 0) return 0;
     size_t got = fread(out + 24, 1, 2048, *fp);                    /* the last sector of a file is short: the rest stays zero */
     return got > 0;
 }

@@ -69,6 +69,18 @@ static void present(Host *h, Cpu *c) {
 
 static double now_s(const Host *h) { return (double)(SDL_GetPerformanceCounter() - h->t0) / (double)SDL_GetPerformanceFrequency(); }
 
+/* Audio queue keeping: the log of a Windows tester showed the queue sitting at 2 frames (~6 KB, p10 4.3 KB) - any frame that takes longer than ~30 ms empties it and pops/crackles.
+ * Keep ~5 frames (~15 KB, 83 ms) queued: prime it with silence at the start, refill with silence when it runs low, and drop a chunk when the device clock lags far behind the wall clock. */
+#define AUDIO_TARGET_BYTES (5 * 2940)
+static void audio_queue(Host *h, const int16_t *buf, int frames) {
+    static int primed;
+    if (!primed) { primed = 1; static int16_t z[2 * 735]; for (int i = 0; i < 5; i++) SDL_QueueAudio(h->audio, z, sizeof z); }
+    Uint32 q = SDL_GetQueuedAudioSize(h->audio);
+    if (q > 4 * AUDIO_TARGET_BYTES) return;                                                      /* the device is slower than the emulation clock: drop this chunk instead of growing the delay */
+    if (q < AUDIO_TARGET_BYTES / 3) { static int16_t z[2 * 735]; SDL_QueueAudio(h->audio, z, sizeof z); }   /* about to run dry: a short silence is better than a gap in the middle of a sample */
+    SDL_QueueAudio(h->audio, buf, (Uint32)frames * 4);
+}
+
 /* Called once per virtual frame, after the emulation of that frame. Order matters for smoothness (finding 0044): first wait for the wall-clock moment of this frame, then present, then
  * read the input for the NEXT frame. Presenting right after the computation (and sleeping afterwards) made the interval between pictures follow the emulation cost of each frame
  * (4..31 ms measured instead of 16.7). */
@@ -98,7 +110,7 @@ static void tick_hook(Cpu *c, void *ud) {
     int16_t buf[2 * 1024];
     int n;
     static double sq; static unsigned sn;                                                                       /* level of what the SPU produced (log line every 600 ticks) */
-    while ((n = io_spu_pull(rt_io_ctx(c), buf, 1024)) > 0) { for (int i = 0; i < 2 * n; i++) sq += (double)buf[i] * buf[i]; sn += 2 * (unsigned)n; if (!ff) SDL_QueueAudio(h->audio, buf, (Uint32)n * 4); }
+    while ((n = io_spu_pull(rt_io_ctx(c), buf, 1024)) > 0) { for (int i = 0; i < 2 * n; i++) sq += (double)buf[i] * buf[i]; sn += 2 * (unsigned)n; if (!ff && h->audio) audio_queue(h, buf, n); }
     if (h->frame % 600 == 0) { fprintf(stderr, "[play] tick %u audio rms %d queued %u bytes device %s\n", rt_hle_ticks(), sn ? (int)sqrt(sq / sn) : 0, h->audio ? SDL_GetQueuedAudioSize(h->audio) : 0, h->audio ? "open" : "NOT OPEN"); sq = 0; sn = 0; }
     SDL_Event e;
     while (SDL_PollEvent(&e)) {
@@ -171,7 +183,7 @@ int main(int argc, char **argv) {
     if (!h.ren) { fail_box("could not create a renderer", SDL_GetError()); return 1; }
     SDL_RenderSetLogicalSize(h.ren, 320, 240);
     SDL_AudioSpec want, have; SDL_zero(want);
-    want.freq = 44100; want.format = AUDIO_S16SYS; want.channels = 2; want.samples = 1024;
+    want.freq = 44100; want.format = AUDIO_S16SYS; want.channels = 2; want.samples = 2048;
     h.audio = SDL_OpenAudioDevice(NULL, 0, &want, &have, 0);
     if (h.audio) SDL_PauseAudioDevice(h.audio, 0); else fprintf(stderr, "[play] audio device could not be opened: %s\n", SDL_GetError());
     for (int i = 0; i < SDL_NumJoysticks(); i++) if (SDL_IsGameController(i)) { h.pad = SDL_GameControllerOpen(i); break; }

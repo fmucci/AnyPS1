@@ -50,3 +50,6 @@ If the BIOS card layer is only created when a card path is given, a headless run
 
 ## A disc folder with hundreds of files does not open on Windows: 512 open files per program (observed under Wine, third title)
 If the sector reader keeps one `FILE*` per file open and the program opens the disc twice, ~400 files x 2 exceeds the C runtime's default of 512 on Windows (macOS/Linux never notice). The player created its window first, so the symptom was a window flashing and closing, with the error only in the redirected log. Open files on first read (retry after closing the reader's handles), call `_setmaxstdio(2048)`, use 64-bit seeks (`long` is 32 bits on Windows), and test the packaged folder under `docker/windows` Wine, not only the .bin.
+
+## A `)` inside an `if ( ... )` block of a .bat ends the script silently (observed, third title)
+`set /p X=Path (or folder): ` inside a parenthesised block closes the block at the `)`: a syntax error before the first command, the double-clicked window flashes and closes and no `logs` folder is created. Keep text out of parentheses in blocks (or escape `^)`) and test the packaged .bat with `wine cmd /c play.bat` in `docker/windows` before shipping.

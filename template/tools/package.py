@@ -44,10 +44,11 @@ if not "%~1"=="" (
 ) else if exist "@DISC@" (
   set DISC=@DISC@
 ) else (
-  set /p DISC=Path to the game's .bin file (or an unpacked disc folder): 
+  set /p DISC=Path to the game's .bin file or an unpacked disc folder: 
 )
 if not exist logs mkdir logs
 for /f %%i in ('powershell -nologo -noprofile -command "Get-Date -Format yyyyMMdd-HHmmss"') do set TS=%%i
+if not defined TS set TS=%DATE:~-4%%RANDOM%
 rem the card the session starts with (the player also writes it a few seconds after the game saves): needed to replay the session later
 for %%C in (*.mcr) do copy /y "%%C" "logs\\session-%TS%.start-%%C" >nul
 rem logs\\session-TS.rec = the pad input (python rec2press.py), logs\\session-TS.log = the console output

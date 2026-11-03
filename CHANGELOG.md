@@ -57,3 +57,4 @@
 - 2026-11-01 · `package.py` play.bat: a `)` in the set /p prompt inside an if-block was a batch syntax error (script ended, no logs); removed, timestamp fallback; pitfall in 13
 - 2026-11-01 · template `frontend/ps1_play.c`: runs by double-click (own logs/, disc/ next to it), message boxes for start-up failures, renderer fallback to software, crash line in the log; 13: pitfall
 - 2026-11-01 · player audio queue: prime ~5 frames, top up with silence, drop on lag, 2048-sample device buffer (a tester heard pops with a 2-frame queue); same in ff9 and the template
+- 2026-11-02 · new 22-hidden-debug-code: method to find debug strings, orphan functions and debug printfs left in a release

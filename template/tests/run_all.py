@@ -60,6 +60,7 @@ def main():
     tests = [("test_interp", ["tests/runtime/test_interp.c"] + rt + ["runtime/io.c", "runtime/gte.c", "runtime/card.c"]),
              ("test_rt", ["tests/runtime/test_rt.c"] + rt + ["runtime/io.c", "runtime/gte.c", "runtime/card.c"]),
              ("test_card", ["tests/runtime/test_card.c", "runtime/card.c"]),
+             ("test_pad_input", ["tests/runtime/test_pad_input.c"]),
              ("test_hw", ["tests/runtime/test_hw.c", "runtime/gte.c", "runtime/card.c"] + rt)]
     with tempfile.TemporaryDirectory() as t:
         for name, srcs in tests:

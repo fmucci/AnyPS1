@@ -16,3 +16,4 @@ __pycache__/
 /dist/
 *.zip
 *.7z
+input.cfg

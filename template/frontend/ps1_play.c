@@ -1,6 +1,6 @@
 /* Native player: the whole-game build with a window, sound and input (queue P5-3). SDL2.
  *   ps1_play DISC.bin [--card FILE] [--scale N] [--fullscreen] [--no-sync] [--ticks N] [--record FILE]
- * Keys: arrows = d-pad, Z = cross, X = circle, A = square, S = triangle, Q/W = L1/R1, E/R = L2/R2, Enter = start, Right Shift = select, F11 = fullscreen, Esc = quit, hold Tab = fast forward, F12 = screenshot (logs/).
+ * Keys (input.cfg, written on first start): WASD/arrows = d-pad, J/K/L/I = square/cross/circle/triangle, Q/E = L1/R1, R/F = L2/R2, Enter = start, Right Shift = select, mouse sideways = turn (F10 = release the mouse), F11 = fullscreen, Esc = quit, hold Tab = fast forward, F12 = screenshot.
  * Game pads (SDL game controller mapping) work too. Build: python3 -I tools/recomp/build_game.py --frontend */
 #include <SDL.h>
 #include <setjmp.h>
@@ -11,6 +11,7 @@
 #include <time.h>
 #include "io.h"
 #include "rt.h"
+#include "pad_input.h"
 
 uint32_t rt_hle_ticks(void);
 #include "../runtime/game_boot.inc"
@@ -24,6 +25,7 @@ typedef struct {
     SDL_AudioDeviceID audio; SDL_GameController *pad;
     FILE *rec; uint32_t last_word;
     uint8_t *rgb; int sync; uint64_t t0; unsigned frame; int fullscreen; int quit; int ff;
+    PadCfg cfg; SDL_Scancode kc[PADIN_MAXBIND]; MouseLook ml; double mdx; int grab, want_grab;       /* keyboard layout (input.cfg) and mouse look */
 } Host;
 
 /* Pad word as the BIOS pad call returns it (bit map of runtime/hle.c `rt_pad_script_add`, active low, the 16 bits of pad 1 in the low half): select 8, L3 9, R3 10, start 11,
@@ -32,10 +34,12 @@ static uint32_t pad_word(Host *h) {
     const Uint8 *k = SDL_GetKeyboardState(NULL);
     uint32_t w = 0xFFFFFFFFu;
     #define B(cond, bit) do { if (cond) w &= ~(1u << (bit)); } while (0)
-    B(k[SDL_SCANCODE_RSHIFT] || k[SDL_SCANCODE_BACKSPACE], 8); B(k[SDL_SCANCODE_RETURN], 11);
-    B(k[SDL_SCANCODE_UP], 12); B(k[SDL_SCANCODE_RIGHT], 13); B(k[SDL_SCANCODE_DOWN], 14); B(k[SDL_SCANCODE_LEFT], 15);
-    B(k[SDL_SCANCODE_E], 0); B(k[SDL_SCANCODE_R], 1); B(k[SDL_SCANCODE_Q], 2); B(k[SDL_SCANCODE_W], 3);
-    B(k[SDL_SCANCODE_S], 4); B(k[SDL_SCANCODE_X], 5); B(k[SDL_SCANCODE_Z], 6); B(k[SDL_SCANCODE_A], 7);
+    for (int i = 0; i < h->cfg.n; i++) if (h->cfg.b[i].bit >= 0 && k[h->kc[i]]) B(1, h->cfg.b[i].bit);       /* input.cfg: see runtime/pad_input.h */
+    if (h->grab) {                                                                                         /* mouse look: horizontal motion presses left/right, the buttons are bound in input.cfg */
+        Uint32 mb = SDL_GetMouseState(NULL, NULL);
+        for (int i = 0; i < 3; i++) if (h->cfg.mouse_btn[i] >= 0 && (mb & SDL_BUTTON(i == 0 ? SDL_BUTTON_LEFT : i == 1 ? SDL_BUTTON_RIGHT : SDL_BUTTON_MIDDLE))) B(1, h->cfg.mouse_btn[i]);
+        w &= padin_mouse_turn(&h->ml, h->mdx, h->cfg.sens); h->mdx = 0;
+    }
     if (h->pad) {
         SDL_GameController *g = h->pad;
         B(SDL_GameControllerGetButton(g, SDL_CONTROLLER_BUTTON_BACK), 8); B(SDL_GameControllerGetButton(g, SDL_CONTROLLER_BUTTON_START), 11);
@@ -51,6 +55,41 @@ static uint32_t pad_word(Host *h) {
     #undef B
     return w;
 }
+
+static const char INPUT_CFG_DEFAULT[] =
+    "# Keyboard and mouse layout. Lines starting with # are comments. Delete this file to get the defaults back.\n"
+    "# scheme wasd      W/A/S/D walk (same as the arrow keys), Q/E = L1/R1, R/F = L2/R2, J/K/L/I = square/cross/circle/triangle, Space = cross\n"
+    "# scheme classic   the first versions' layout: Z/X/A/S = cross/circle/square/triangle, Q/W = L1/R1, E/R = L2/R2\n"
+    "scheme wasd\n"
+    "# Mouse look: moving the mouse sideways presses left/right (the game's pad is digital, so the turn speed is the game's own).\n"
+    "# F10 releases/captures the mouse (use it in menus). Higher sensitivity = less motion for the same turn.\n"
+    "mouse on\n"
+    "sensitivity 1.0\n"
+    "# Mouse buttons -> pad buttons (none, up, down, left, right, cross, circle, square, triangle, l1, r1, l2, r2, l3, r3, start, select)\n"
+    "mouse_left square\n"
+    "mouse_right circle\n"
+    "mouse_middle triangle\n"
+    "# Extra keys: key <SDL key name> <button>, for example:  key Left Shift l1      key Tab none   (Tab is fast-forward and cannot be rebound)\n";
+
+static void load_input(Host *h, int write_default) {
+    padin_defaults(&h->cfg);
+    FILE *f = fopen("input.cfg", "rb");
+    if (!f && write_default) { f = fopen("input.cfg", "wb"); if (f) { fwrite(INPUT_CFG_DEFAULT, 1, sizeof INPUT_CFG_DEFAULT - 1, f); fclose(f); fprintf(stderr, "[play] wrote input.cfg (keyboard/mouse layout)\n"); } f = NULL; }
+    if (f) {
+        char txt[8192]; size_t n = fread(txt, 1, sizeof txt - 1, f); txt[n] = 0; fclose(f);
+        char err[160] = ""; int bad = padin_parse(&h->cfg, txt, err, sizeof err);
+        if (bad) fprintf(stderr, "[play] input.cfg: %d line(s) not understood, first: %s\n", bad, err);
+    }
+    int m = 0;
+    for (int i = 0; i < h->cfg.n; i++) {
+        SDL_Scancode sc = SDL_GetScancodeFromName(h->cfg.b[i].key);
+        if (sc == SDL_SCANCODE_UNKNOWN || sc == SDL_SCANCODE_TAB) { fprintf(stderr, "[play] input.cfg: unknown key '%s'\n", h->cfg.b[i].key); continue; }
+        h->cfg.b[m] = h->cfg.b[i]; h->kc[m++] = sc;
+    }
+    h->cfg.n = m;
+}
+
+static void set_grab(Host *h, int on) { h->grab = on; SDL_SetRelativeMouseMode(on ? SDL_TRUE : SDL_FALSE); if (!on) h->mdx = 0; }
 
 static void present(Host *h, Cpu *c) {
     int w, hh;
@@ -120,6 +159,10 @@ static void tick_hook(Cpu *c, void *ud) {
             char fn[64]; snprintf(fn, sizeof fn, "logs/shot-%u.ppm", rt_hle_ticks()); FILE *f = fopen(fn, "wb");
             if (f) { fprintf(f, "P6\n%d %d\n255\n", h->tw, h->th); fwrite(h->rgb, 3, (size_t)h->tw * h->th, f); fclose(f); fprintf(stderr, "[play] %s\n", fn); }
         }
+        else if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_F10 && h->want_grab >= 0) { h->want_grab = !h->want_grab; set_grab(h, h->want_grab); fprintf(stderr, "[play] mouse look %s\n", h->want_grab ? "on" : "off"); }
+        else if (e.type == SDL_MOUSEMOTION && h->grab) h->mdx += e.motion.xrel;
+        else if (e.type == SDL_WINDOWEVENT && e.window.event == SDL_WINDOWEVENT_FOCUS_LOST && h->grab) set_grab(h, 0);
+        else if (e.type == SDL_WINDOWEVENT && e.window.event == SDL_WINDOWEVENT_FOCUS_GAINED && h->want_grab > 0 && !h->grab) set_grab(h, 1);
         else if (e.type == SDL_CONTROLLERDEVICEADDED && !h->pad) h->pad = SDL_GameControllerOpen(e.cdevice.which);
         else if (e.type == SDL_CONTROLLERDEVICEREMOVED && h->pad) { SDL_GameControllerClose(h->pad); h->pad = NULL; }
     }
@@ -187,6 +230,9 @@ int main(int argc, char **argv) {
     h.audio = SDL_OpenAudioDevice(NULL, 0, &want, &have, 0);
     if (h.audio) SDL_PauseAudioDevice(h.audio, 0); else fprintf(stderr, "[play] audio device could not be opened: %s\n", SDL_GetError());
     for (int i = 0; i < SDL_NumJoysticks(); i++) if (SDL_IsGameController(i)) { h.pad = SDL_GameControllerOpen(i); break; }
+    load_input(&h, !g_scripted);
+    h.want_grab = (h.cfg.mouse_on && !g_scripted && !SDL_getenv("SDL_VIDEODRIVER")) ? 1 : -1;               /* -1: no mouse look (scripted run, headless driver or "mouse off") */
+    if (h.want_grab > 0) set_grab(&h, 1);
     h.t0 = SDL_GetPerformanceCounter();
     Cpu cpu, *c = &cpu;
     uint32_t entry;

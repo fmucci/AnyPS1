@@ -28,8 +28,9 @@ You need your own disc image of the game (the .bin file of a single-track .bin/.
 recompiled from it; do not share this folder.
 
 Run:   play.bat      (uses the folder "disc" or "@DISC@" from this folder when present; otherwise pass the path: play.bat "C:\\path\\to\\@DISC@", or drag the .bin onto play.bat)
-Keys:  arrows = d-pad, Z = cross, X = circle, A = square, S = triangle, Q/W = L1/R1, E/R = L2/R2, Enter = start, Right Shift = select,
-       F11 = fullscreen, Esc = quit, hold Tab = fast forward, F12 = screenshot (logs/).  Game controllers work too.
+Keys:  W/A/S/D or arrows = d-pad (walk/turn), mouse sideways = turn, J/K/L/I = square/cross/circle/triangle, Z/X = cross/circle, Q/E = L1/R1, R/F = L2/R2,
+       Enter = start, Right Shift = select, F10 = release/capture the mouse (use it in menus), F11 = fullscreen, Esc = quit, hold Tab = fast forward, F12 = screenshot (logs/).
+       The layout is the text file input.cfg (written on first start, editable; delete it to restore the defaults).  Game controllers work too.
 Saves: @NAME@.mcr in this folder (a virtual memory card); written a few seconds after the game saves and again when you quit.\nLogs:  logs/session-*.rec (your pad input), .log (console) and .start-*.mcr (the card you started with): send them with a report, they let us replay your session.
 Options (ps1_play.exe): --scale N, --fullscreen, --no-sync (run unthrottled), --card FILE
 Report: whether it starts, picture, sound, controls, speed, and any text printed in the console window.

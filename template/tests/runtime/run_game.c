@@ -105,6 +105,10 @@ int main(int argc, char **argv) {
     if (setjmp(g_jb)) stopped = -1; else stopped = rt_run_entry(c, entry);
     rt_trace_close();
     if (wav) io_spu_capture_close(rt_io_ctx(c));
+    if (getenv("PS1_RAMBIN")) {                              /* debug aid: PS1_RAMBIN=file writes the 2 MiB guest RAM (binary) after the run */
+        FILE *rf = fopen(getenv("PS1_RAMBIN"), "wb");
+        if (rf) { fwrite(rt_ram_ptr(c), 1, 0x200000, rf); fclose(rf); }
+    }
     if (getenv("PS1_DUMP")) {                               /* debug aid: PS1_DUMP=hexaddr,len prints guest memory as words after the run */
         char spec[512]; snprintf(spec, sizeof spec, "%s", getenv("PS1_DUMP"));
         for (char *tok = strtok(spec, ";"); tok; tok = strtok(NULL, ";")) {          /* several ranges separated by ';' */

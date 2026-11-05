@@ -16,6 +16,7 @@ typedef struct {
     PadBind b[PADIN_MAXBIND]; int n;
     int mouse_on;                                             /* relative mouse -> left/right presses */
     double sens;                                              /* 1.0 = 10 pixels of motion per frame for a full-speed turn */
+    int camera;                                               /* 1: mouse sideways orbits the game camera by writing the game's memory (needs a LookProfile); 0: left/right presses */
     int mouse_btn[3];                                         /* pad bit for left / right / middle button, -1 = none */
 } PadCfg;
 
@@ -49,7 +50,7 @@ static inline void padin_scheme(PadCfg *c, int wasd) {
 static inline void padin_defaults(PadCfg *c) {
     memset(c, 0, sizeof *c);
     padin_scheme(c, 1);
-    c->mouse_on = 1; c->sens = 1.0;
+    c->mouse_on = 1; c->sens = 1.0; c->camera = 1;
     c->mouse_btn[0] = padin_bit("square"); c->mouse_btn[1] = padin_bit("circle"); c->mouse_btn[2] = padin_bit("triangle");
 }
 
@@ -66,6 +67,7 @@ static inline int padin_line(PadCfg *c, const char *line) {
     for (char *p = cmd; *p; p++) *p = (char)tolower((unsigned char)*p);
     if (!strcmp(cmd, "scheme")) { if (!strcmp(rest, "wasd")) { padin_scheme(c, 1); return 0; } if (!strcmp(rest, "classic")) { padin_scheme(c, 0); return 0; } return 1; }
     if (!strcmp(cmd, "mouse")) { if (!strcmp(rest, "on")) { c->mouse_on = 1; return 0; } if (!strcmp(rest, "off")) { c->mouse_on = 0; return 0; } return 1; }
+    if (!strcmp(cmd, "mouse_mode")) { if (!strcmp(rest, "camera")) { c->camera = 1; return 0; } if (!strcmp(rest, "turn")) { c->camera = 0; return 0; } return 1; }
     if (!strcmp(cmd, "sensitivity")) { double v = atof(rest); if (v <= 0.0 || v > 50.0) return 1; c->sens = v; return 0; }
     if (!strncmp(cmd, "mouse_", 6)) {
         int i = !strcmp(cmd + 6, "left") ? 0 : !strcmp(cmd + 6, "right") ? 1 : !strcmp(cmd + 6, "middle") ? 2 : -1;
@@ -104,5 +106,38 @@ static inline uint32_t padin_mouse_turn(MouseLook *m, double dx, double sens) {
     if (m->acc >= PADIN_UNIT * 0.5) { m->acc -= PADIN_UNIT; return ~(1u << 13); }
     if (m->acc <= -PADIN_UNIT * 0.5) { m->acc += PADIN_UNIT; return ~(1u << 15); }
     return 0xFFFFFFFFu;
+}
+
+/* ---- camera orbit through the game's memory (per-title profile; the games read a digital pad, so this is a host-side write, finding 0052) ----
+ * Model, observed in the first port (FB2.EXE): the view yaw is (orbit - heading) & mask; the heading is a field of the player's object (a copy of it is kept in a global), the orbit offset is a
+ * global that is 0 in normal play, and a camera function eases the view toward that target. Adding to the orbit swings the camera round the player without turning him; to walk toward where
+ * the camera looks the player is turned by the orbit amount and the orbit is zeroed (heading -= orbit, orbit = 0 leaves the view target unchanged). The player's object is found by its id and
+ * by the heading copy (the object list is not walked), then checked every frame. */
+typedef struct { uint32_t yaw_addr; int bits; uint32_t id_addr, copy_addr; int head_off; int sign; double scale; int enabled; } LookProfile;   /* scale: angle units per mouse pixel */
+typedef struct { double acc; uint32_t obj; } LookState;
+static inline uint32_t padin_rd32(const uint8_t *ram, uint32_t a) { uint32_t v; memcpy(&v, ram + (a & 0x1FFFFC), 4); return v; }
+static inline void padin_wr32(uint8_t *ram, uint32_t a, uint32_t v) { memcpy(ram + (a & 0x1FFFFC), &v, 4); }
+static inline int padin_obj_id(const uint8_t *ram, uint32_t o) { uint32_t w; memcpy(&w, ram + ((o + 4) & 0x1FFFFC), 4); return (int)(w & 0xFFFF); }
+/* 1 if st->obj is (still, or newly found as) the player's object */
+static inline int padin_look_find(const LookProfile *p, LookState *st, const uint8_t *ram) {
+    uint32_t id = padin_rd32(ram, p->id_addr) & 0xFFFF;
+    if (st->obj >= 0x80010000u && st->obj <= 0x801FFFC0u && padin_obj_id(ram, st->obj) == (int)id) return 1;
+    uint32_t cp = padin_rd32(ram, p->copy_addr), found = 0; int n = 0;
+    for (uint32_t o = 0x80100000u; o <= 0x801FFF00u; o += 4)
+        if (padin_obj_id(ram, o) == (int)id && padin_rd32(ram, o + (uint32_t)p->head_off) == cp) { found = o; n++; }
+    st->obj = (n == 1) ? found : 0;                              /* an ambiguous match is not trusted */
+    return n == 1;
+}
+/* dx: mouse pixels since the last frame; walking: a movement key is held. Returns 1 if memory was written. */
+static inline int padin_look_step(const LookProfile *p, LookState *st, uint8_t *ram, double dx, double sens, int walking) {
+    if (!p->enabled || (dx == 0.0 && !walking)) return 0;
+    uint32_t mask = (1u << p->bits) - 1, orbit = padin_rd32(ram, p->yaw_addr) & mask; int wrote = 0;
+    if (!padin_look_find(p, st, ram)) return 0;
+    if (dx != 0.0) { st->acc += dx * sens * p->scale * p->sign; int whole = (int)st->acc; st->acc -= whole; if (whole) { orbit = (uint32_t)((int)orbit + whole) & mask; padin_wr32(ram, p->yaw_addr, orbit); wrote = 1; } }
+    if (walking && orbit) {
+        uint32_t h = padin_rd32(ram, st->obj + (uint32_t)p->head_off);
+        padin_wr32(ram, st->obj + (uint32_t)p->head_off, (h - orbit) & mask); padin_wr32(ram, p->yaw_addr, 0); wrote = 1;
+    }
+    return wrote;
 }
 #endif

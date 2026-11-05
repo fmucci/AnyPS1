@@ -39,6 +39,29 @@ int main(void) {
     m.acc = 0; padin_mouse_turn(&m, 100000.0, 1.0);                                                          /* a flick is clamped */
     int tail = 0; for (int i = 0; i < 100; i++) tail += !(padin_mouse_turn(&m, 0.0, 1.0) & (1u << 13));
     assert(tail <= 6);
+    /* camera orbit through the game's memory (fake 2 MiB RAM with the FB2 layout) */
+    static uint8_t ram[0x200000];
+    LookProfile lp = { 0x800bbe2c, 10, 0x800c7a4c, 0x800bb1a8, 36, -1, 0.35, 1 }; LookState ls = {0};
+    uint32_t obj = 0x801a6020, decoy = 0x801ac420;
+    padin_wr32(ram, 0x800c7a4c, 2); padin_wr32(ram, 0x800bb1a8, 520);
+    padin_wr32(ram, obj + 4, 2); padin_wr32(ram, obj + 36, 520);                                                  /* the player */
+    padin_wr32(ram, decoy + 4, 258); padin_wr32(ram, decoy + 36, 520);                                            /* same heading, other id */
+    assert(!padin_look_step(&lp, &ls, ram, 0.0, 1.0, 0) && padin_rd32(ram, 0x800bbe2c) == 0);                  /* no motion, not walking: nothing written */
+    for (int i = 0; i < 100; i++) padin_look_step(&lp, &ls, ram, 10.0, 1.0, 0);                                   /* 1000 px to the right: orbit shrinks by 350 (mod 1024) */
+    assert(ls.obj == obj && padin_rd32(ram, 0x800bbe2c) == ((1024 - 350) & 1023) && padin_rd32(ram, obj + 36) == 520);
+    uint32_t orbit = padin_rd32(ram, 0x800bbe2c);
+    assert(padin_look_step(&lp, &ls, ram, 0.0, 1.0, 1));                                                          /* walking: heading -= orbit, orbit = 0 */
+    assert(padin_rd32(ram, 0x800bbe2c) == 0 && padin_rd32(ram, obj + 36) == ((520 - orbit) & 1023) && padin_rd32(ram, decoy + 36) == 520);
+    uint32_t yaw_before = ((orbit - 520) & 1023), yaw_after = ((0 - padin_rd32(ram, obj + 36)) & 1023);
+    assert(yaw_before == yaw_after);                                                                              /* the view target (orbit - heading) did not change */
+    padin_wr32(ram, 0x800bb1a8, padin_rd32(ram, obj + 36));                                                       /* the game refreshes its copy */
+    padin_wr32(ram, 0x800c7a4c, 3); assert(!padin_look_step(&lp, &ls, ram, 5.0, 1.0, 0) && ls.obj == 0);          /* the player id changed: the cached object is dropped, no object matches */
+    padin_wr32(ram, 0x800c7a4c, 2); padin_wr32(ram, decoy + 4, 2);                                                /* two objects with the id and the same heading: ambiguous, not trusted */
+    padin_wr32(ram, decoy + 36, padin_rd32(ram, obj + 36)); ls.obj = 0; assert(!padin_look_step(&lp, &ls, ram, 5.0, 1.0, 0));
+    padin_wr32(ram, decoy + 4, 258); assert(padin_look_step(&lp, &ls, ram, 20.0, 1.0, 0) && ls.obj == obj);       /* unique again */
+    lp.enabled = 0; assert(!padin_look_step(&lp, &ls, ram, 50.0, 1.0, 1));
+    PadCfg c2; padin_defaults(&c2); assert(c2.camera == 1);
+    assert(padin_line(&c2, "mouse_mode turn") == 0 && c2.camera == 0 && padin_line(&c2, "mouse_mode camera") == 0 && c2.camera == 1 && padin_line(&c2, "mouse_mode x") == 1);
     printf("pad_input tests passed\n");
     return 0;
 }

@@ -12,6 +12,7 @@
 #include "io.h"
 #include "rt.h"
 #include "pad_input.h"
+#include "look_profile.h"
 
 uint32_t rt_hle_ticks(void);
 #include "../runtime/game_boot.inc"
@@ -25,7 +26,7 @@ typedef struct {
     SDL_AudioDeviceID audio; SDL_GameController *pad;
     FILE *rec; uint32_t last_word;
     uint8_t *rgb; int sync; uint64_t t0; unsigned frame; int fullscreen; int quit; int ff;
-    PadCfg cfg; SDL_Scancode kc[PADIN_MAXBIND]; MouseLook ml; double mdx; int grab, want_grab;       /* keyboard layout (input.cfg) and mouse look */
+    PadCfg cfg; SDL_Scancode kc[PADIN_MAXBIND]; MouseLook ml; LookState look; double mdx, look_dx; int grab, want_grab;       /* keyboard layout (input.cfg) and mouse look */
 } Host;
 
 /* Pad word as the BIOS pad call returns it (bit map of runtime/hle.c `rt_pad_script_add`, active low, the 16 bits of pad 1 in the low half): select 8, L3 9, R3 10, start 11,
@@ -38,7 +39,9 @@ static uint32_t pad_word(Host *h) {
     if (h->grab) {                                                                                         /* mouse look: horizontal motion presses left/right, the buttons are bound in input.cfg */
         Uint32 mb = SDL_GetMouseState(NULL, NULL);
         for (int i = 0; i < 3; i++) if (h->cfg.mouse_btn[i] >= 0 && (mb & SDL_BUTTON(i == 0 ? SDL_BUTTON_LEFT : i == 1 ? SDL_BUTTON_RIGHT : SDL_BUTTON_MIDDLE))) B(1, h->cfg.mouse_btn[i]);
-        w &= padin_mouse_turn(&h->ml, h->mdx, h->cfg.sens); h->mdx = 0;
+        if (h->cfg.camera && LOOK_PROFILE.enabled) h->look_dx = h->mdx;                                  /* camera mode: the tick hook writes the game's orbit angle */
+        else w &= padin_mouse_turn(&h->ml, h->mdx, h->cfg.sens);
+        h->mdx = 0;
     }
     if (h->pad) {
         SDL_GameController *g = h->pad;
@@ -64,6 +67,8 @@ static const char INPUT_CFG_DEFAULT[] =
     "# Mouse look: moving the mouse sideways presses left/right (the game's pad is digital, so the turn speed is the game's own).\n"
     "# F10 releases/captures the mouse (use it in menus). Higher sensitivity = less motion for the same turn.\n"
     "mouse on\n"
+    "# mouse_mode camera : sideways motion swings the game camera round the player (writes the game's memory; a .rec recording does not capture it). turn : left/right presses (reproducible).\n"
+    "mouse_mode camera\n"
     "sensitivity 1.0\n"
     "# Mouse buttons -> pad buttons (none, up, down, left, right, cross, circle, square, triangle, l1, r1, l2, r2, l3, r3, start, select)\n"
     "mouse_left square\n"
@@ -169,7 +174,9 @@ static void tick_hook(Cpu *c, void *ud) {
     { static unsigned seen, quiet; unsigned g = rt_hle_card_gen();                                 /* the card is written to disk 30 frames after the game's last change to it, so a force-quit, a crash or a power loss keeps the save (it was written only at exit) */
       if (g != seen) { seen = g; quiet = 0; } else if (quiet < 1000 && ++quiet == 30 && !rt_hle_card_save()) fprintf(stderr, "[play] could not write the memory card\n"); }
     if (h->quit) { rt_hle_card_save(); SDL_Quit(); exit(0); }
-    { uint32_t w = pad_word(h); if (!g_scripted) rt_pad_set(w);                                    /* the input of the next frame is sampled as late as possible */
+    { h->look_dx = 0; uint32_t w = pad_word(h); if (!g_scripted) rt_pad_set(w);
+      if (!g_scripted && LOOK_PROFILE.enabled && h->cfg.camera) padin_look_step(&LOOK_PROFILE, &h->look, rt_ram_ptr(c), h->look_dx, h->cfg.sens, (w & 0xF000u) != 0xF000u);       /* any d-pad direction held: turn the player toward where the camera looks */
+                                    /* the input of the next frame is sampled as late as possible */
       if (h->rec && w != h->last_word) { fprintf(h->rec, "%u %08x\n", rt_hle_ticks() + 1, w); fflush(h->rec); h->last_word = w; } }       /* recorded for the NEXT frame (replay applies it from that tick on) */
 }
 

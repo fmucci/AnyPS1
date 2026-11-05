@@ -5,7 +5,6 @@
 #ifndef PAD_INPUT_H
 #define PAD_INPUT_H
 #include <ctype.h>
-#include <math.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -39,8 +38,8 @@ static inline void padin_scheme(PadCfg *c, int wasd) {
         {"Z", "cross"}, {"X", "circle"}};
     for (unsigned i = 0; i < sizeof common / sizeof common[0]; i++) padin_bind(c, common[i][0], padin_bit(common[i][1]));
     if (wasd) {                                               /* WASD walks; the buttons that were on W/A/S move to the right-hand side of the keyboard */
-        static const char *const w[][2] = {{"W", "up"}, {"A", "left"}, {"S", "down"}, {"D", "right"}, {"Q", "l1"}, {"E", "r1"}, {"R", "l2"}, {"F", "r2"},
-            {"J", "square"}, {"K", "cross"}, {"L", "circle"}, {"I", "triangle"}, {"Space", "cross"}};
+        static const char *const w[][2] = {{"W", "up"}, {"A", "left"}, {"S", "down"}, {"D", "right"}, {"Q", "square"}, {"E", "circle"}, {"F", "triangle"}, {"Space", "cross"},
+            {"1", "r1"}, {"2", "r2"}, {"3", "l1"}, {"4", "l2"}};
         for (unsigned i = 0; i < sizeof w / sizeof w[0]; i++) padin_bind(c, w[i][0], padin_bit(w[i][1]));
     } else {                                                  /* the layout of the first player versions */
         static const char *const k[][2] = {{"E", "l2"}, {"R", "r2"}, {"Q", "l1"}, {"W", "r1"}, {"S", "triangle"}, {"A", "square"}};
@@ -113,8 +112,8 @@ static inline uint32_t padin_mouse_turn(MouseLook *m, double dx, double sens) {
  * Observed in the first port (FB2.EXE): the player is an object whose heading is a 10-bit angle (1024 per turn) at +36; the game's camera follows the heading (behind the player, eased), so adding
  * to the heading turns the player on the spot and the view follows. Several globals hold the pointer to the player's object from the moment it exists (zero before); the player is trusted
  * only while three of them agree and point into RAM at a plausible heading, so nothing is written during loading, menus or movies. */
-typedef struct { uint32_t ptr_addr[3]; int head_off; int bits; int sign; double scale; uint32_t orbit_addr; int enabled; } LookProfile;   /* scale: angle units per mouse pixel; orbit_addr: the camera's offset word (view target = orbit - heading), 0 if none */
-typedef struct { double acc; int moving; } LookState;
+typedef struct { uint32_t ptr_addr[3]; int head_off; int bits; int sign; double scale; int enabled; } LookProfile;   /* scale: angle units per mouse pixel */
+typedef struct { double acc; } LookState;
 static inline uint32_t padin_rd32(const uint8_t *ram, uint32_t a) { uint32_t v; memcpy(&v, ram + (a & 0x1FFFFC), 4); return v; }
 static inline void padin_wr32(uint8_t *ram, uint32_t a, uint32_t v) { memcpy(ram + (a & 0x1FFFFC), &v, 4); }
 /* the player's object address, or 0 */
@@ -136,25 +135,16 @@ static inline int padin_look_step(const LookProfile *p, LookState *st, uint8_t *
     return 1;
 }
 
-/* Camera-relative walking (finding 0053). The view target is (orbit - heading) & mask, so heading and orbit can be changed by the same amount without the camera moving. The camera heading is
- * C = heading - orbit. The mouse changes C; the direction keys give an angle theta relative to C (W 0, D +quarter turn, S half, A -quarter, diagonals in between); while a key is held the player
- * faces C + theta (heading = C + theta, orbit = theta: the camera does not move) and the caller presses the game's "forward"; on release or when only the mouse moves the player faces C
- * (heading = C, orbit = 0). keys: bit0 up, bit1 right, bit2 down, bit3 left. Returns 1 = press forward, 0 = nothing, -1 = no trusted player (the caller passes the keys through as a d-pad). */
-static inline int padin_look_move(const LookProfile *p, LookState *st, uint8_t *ram, double dx, double sens, int keys) {
-    if (!p->enabled || !p->orbit_addr) return -1;
-    uint32_t o = padin_look_player(p, ram); if (!o) { st->moving = 0; return -1; }
-    uint32_t mask = (1u << p->bits) - 1, turn = 1u << p->bits;
+/* Walking relative to the camera without turning the player (finding 0052, addendum 5). The game's d-pad turns the player (tank controls), but it has a side-step: L2 / R2 move him sideways with
+ * his heading unchanged, "down" walks backwards facing front, and "up" together with L2/R2 only walks forward (the side-step is ignored). The mouse turns the player (the camera follows, see
+ * padin_look_step), so the keys become buttons: W up, S down, A L2, D R2; a diagonal alternates forward and side-step presses (6 ticks forward, 9 ticks side-step in a 15-tick cycle: about 49
+ * degrees off forward, measured on the first port). keys: bit0 up, bit1 right, bit2 down, bit3 left. Returns an active-low pad word with only the wanted bits cleared. */
+static inline uint32_t padin_walk(int keys, unsigned tick) {
     int fwd = ((keys & 1) ? 1 : 0) - ((keys & 4) ? 1 : 0), side = ((keys & 2) ? 1 : 0) - ((keys & 8) ? 1 : 0);
-    int moving = fwd || side;
-    if (!moving && dx == 0.0 && !st->moving) return 0;                       /* nothing to do: the game keeps its own heading and orbit */
-    uint32_t h = padin_rd32(ram, o + (uint32_t)p->head_off) & mask, orbit = padin_rd32(ram, p->orbit_addr) & mask;
-    int c = (int)((h - orbit) & mask);
-    st->acc += dx * sens * p->scale * p->sign; int whole = (int)st->acc; st->acc -= whole; c += whole;
-    int theta = moving ? (int)lround(atan2((double)side, (double)fwd) * (double)turn / 6.283185307179586) : 0;
-    uint32_t nh = (uint32_t)(c + theta) & mask, no = (uint32_t)theta & mask;
-    if (nh != h) padin_wr32(ram, o + (uint32_t)p->head_off, nh);
-    if (no != orbit) padin_wr32(ram, p->orbit_addr, no);
-    st->moving = moving;
-    return moving;
+    int fb = fwd > 0 ? 12 : 14, lat = side < 0 ? 0 : 1;
+    if (!fwd && !side) return 0xFFFFFFFFu;
+    if (!side) return ~(1u << fb);
+    if (!fwd) return ~(1u << lat);
+    return (tick % 15) < 6 ? ~(1u << fb) : ~(1u << lat);
 }
 #endif

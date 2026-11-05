@@ -62,3 +62,4 @@
 - 2026-11-03 · docs/05: the SDK CD_sync gives up after 0x1e0000 polling iterations or 480 frames: P <= 1,966,080 / longest CD wait in ticks (f2b: 8192)
 - 2026-11-05 · template player: keyboard layout file `input.cfg` (WASD default, rebinding, mouse buttons) and mouse sideways = left/right presses (`runtime/pad_input.h`, unit test); new docs/23-input-mapping
 - 2026-11-05 · template: `LookProfile` / `padin_look_step` (camera orbit through the game's memory, unit-tested; disabled by default) and the recipe in docs/23
+- 2026-11-05 · template: LookProfile reworked (mouse turns the player's heading, player found through three pointer globals); docs/23 rewritten; default mouse buttons left=square right=triangle middle=circle

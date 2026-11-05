@@ -16,7 +16,7 @@ typedef struct {
     PadBind b[PADIN_MAXBIND]; int n;
     int mouse_on;                                             /* relative mouse -> left/right presses */
     double sens;                                              /* 1.0 = 10 pixels of motion per frame for a full-speed turn */
-    int camera;                                               /* 1: mouse sideways orbits the game camera by writing the game's memory (needs a LookProfile); 0: left/right presses */
+    int camera;                                               /* 1: mouse sideways turns the player by writing the game's heading (needs a LookProfile); 0: left/right presses */
     int mouse_btn[3];                                         /* pad bit for left / right / middle button, -1 = none */
 } PadCfg;
 
@@ -108,43 +108,30 @@ static inline uint32_t padin_mouse_turn(MouseLook *m, double dx, double sens) {
     return 0xFFFFFFFFu;
 }
 
-/* ---- camera orbit through the game's memory (per-title profile; the games read a digital pad, so this is a host-side write, finding 0052) ----
- * Model, observed in the first port (FB2.EXE): the view yaw is (orbit - heading) & mask; the heading is a field of the player's object (a copy of it is kept in a global), the orbit offset is a
- * global that is 0 in normal play, and a camera function eases the view toward that target. Adding to the orbit swings the camera round the player without turning him; to walk toward where
- * the camera looks the player is turned by the orbit amount and the orbit is zeroed (heading -= orbit, orbit = 0 leaves the view target unchanged). The player's object is found by its id and
- * by the heading copy (the object list is not walked), then checked every frame. */
-typedef struct { uint32_t yaw_addr; int bits; uint32_t id_addr, copy_addr; int head_off; int sign; double scale; uint32_t lock_addr; int enabled; } LookProfile;   /* scale: angle units per mouse pixel; lock_addr: byte, non-zero while the game's view is locked to the player's heading (aiming) - 0 = no such flag */
-typedef struct { double acc; uint32_t obj; } LookState;
+/* ---- mouse turns the player through the game's memory (per-title profile; the games read a digital pad, so this is a host-side write, findings 0052/0053) ----
+ * Observed in the first port (FB2.EXE): the player is an object whose heading is a 10-bit angle (1024 per turn) at +36; the game's camera follows the heading (behind the player, eased), so adding
+ * to the heading turns the player on the spot and the view follows. Several globals hold the pointer to the player's object from the moment it exists (zero before); the player is trusted
+ * only while three of them agree and point into RAM at a plausible heading, so nothing is written during loading, menus or movies. */
+typedef struct { uint32_t ptr_addr[3]; int head_off; int bits; int sign; double scale; int enabled; } LookProfile;   /* scale: angle units per mouse pixel */
+typedef struct { double acc; } LookState;
 static inline uint32_t padin_rd32(const uint8_t *ram, uint32_t a) { uint32_t v; memcpy(&v, ram + (a & 0x1FFFFC), 4); return v; }
 static inline void padin_wr32(uint8_t *ram, uint32_t a, uint32_t v) { memcpy(ram + (a & 0x1FFFFC), &v, 4); }
-static inline int padin_obj_id(const uint8_t *ram, uint32_t o) { uint32_t w; memcpy(&w, ram + ((o + 4) & 0x1FFFFC), 4); return (int)(w & 0xFFFF); }
-/* 1 if st->obj is (still, or newly found as) the player's object */
-static inline int padin_look_find(const LookProfile *p, LookState *st, const uint8_t *ram) {
-    uint32_t id = padin_rd32(ram, p->id_addr) & 0xFFFF;
-    if (st->obj >= 0x80010000u && st->obj <= 0x801FFFC0u && padin_obj_id(ram, st->obj) == (int)id) return 1;
-    uint32_t cp = padin_rd32(ram, p->copy_addr), found = 0; int n = 0;
-    for (uint32_t o = 0x80100000u; o <= 0x801FFF00u; o += 4)
-        if (padin_obj_id(ram, o) == (int)id && padin_rd32(ram, o + (uint32_t)p->head_off) == cp) { found = o; n++; }
-    st->obj = (n == 1) ? found : 0;                              /* an ambiguous match is not trusted */
-    return n == 1;
+/* the player's object address, or 0 */
+static inline uint32_t padin_look_player(const LookProfile *p, const uint8_t *ram) {
+    uint32_t o = padin_rd32(ram, p->ptr_addr[0]);
+    if (o < 0x80100000u || o > 0x801FFF00u || (o & 3)) return 0;
+    if (padin_rd32(ram, p->ptr_addr[1]) != o || padin_rd32(ram, p->ptr_addr[2]) != o) return 0;
+    if (padin_rd32(ram, o + (uint32_t)p->head_off) >= (1u << p->bits)) return 0;
+    return o;
 }
-/* dx: mouse pixels since the last frame; walking: a movement key is held. Returns 1 if memory was written. */
-static inline int padin_look_step(const LookProfile *p, LookState *st, uint8_t *ram, double dx, double sens, int walking) {
-    if (!p->enabled) return 0;
-    int locked = p->lock_addr && ram[p->lock_addr & 0x1FFFFF] != 0;
-    if (dx == 0.0 && !walking && !(locked && padin_rd32(ram, p->yaw_addr) != 0)) return 0;        /* nothing to do (and no scan for the player object) */
-    uint32_t mask = (1u << p->bits) - 1, orbit = padin_rd32(ram, p->yaw_addr) & mask; int wrote = 0;
-    if (!padin_look_find(p, st, ram)) return 0;       /* aiming: the view follows the heading at once, so the mouse turns the player (an orbit would swing the view away from where he aims) */
-    if (locked && dx != 0.0) {
-        st->acc += dx * sens * p->scale * -p->sign; int whole = (int)st->acc; st->acc -= whole;
-        if (whole) { uint32_t h = padin_rd32(ram, st->obj + (uint32_t)p->head_off); padin_wr32(ram, st->obj + (uint32_t)p->head_off, (uint32_t)((int)h + whole) & mask); wrote = 1; }
-        dx = 0.0;
-    }
-    if (dx != 0.0) { st->acc += dx * sens * p->scale * p->sign; int whole = (int)st->acc; st->acc -= whole; if (whole) { orbit = (uint32_t)((int)orbit + whole) & mask; padin_wr32(ram, p->yaw_addr, orbit); wrote = 1; } }
-    if ((walking || locked) && orbit) {
-        uint32_t h = padin_rd32(ram, st->obj + (uint32_t)p->head_off);
-        padin_wr32(ram, st->obj + (uint32_t)p->head_off, (h - orbit) & mask); padin_wr32(ram, p->yaw_addr, 0); wrote = 1;
-    }
-    return wrote;
+/* dx: mouse pixels since the last frame. Returns 1 if memory was written. */
+static inline int padin_look_step(const LookProfile *p, LookState *st, uint8_t *ram, double dx, double sens) {
+    if (!p->enabled || dx == 0.0) return 0;
+    uint32_t o = padin_look_player(p, ram); if (!o) return 0;
+    st->acc += dx * sens * p->scale * p->sign; int whole = (int)st->acc; st->acc -= whole;
+    if (!whole) return 0;
+    uint32_t mask = (1u << p->bits) - 1, h = padin_rd32(ram, o + (uint32_t)p->head_off);
+    padin_wr32(ram, o + (uint32_t)p->head_off, (uint32_t)((int)h + whole) & mask);
+    return 1;
 }
 #endif

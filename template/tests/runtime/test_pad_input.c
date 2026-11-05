@@ -41,7 +41,7 @@ int main(void) {
     assert(tail <= 6);
     /* camera orbit through the game's memory (fake 2 MiB RAM with the FB2 layout) */
     static uint8_t ram[0x200000];
-    LookProfile lp = { 0x800bbe2c, 10, 0x800c7a4c, 0x800bb1a8, 36, -1, 0.35, 1 }; LookState ls = {0};
+    LookProfile lp = { 0x800bbe2c, 10, 0x800c7a4c, 0x800bb1a8, 36, -1, 0.35, 0x800e1990, 1 }; LookState ls = {0};
     uint32_t obj = 0x801a6020, decoy = 0x801ac420;
     padin_wr32(ram, 0x800c7a4c, 2); padin_wr32(ram, 0x800bb1a8, 520);
     padin_wr32(ram, obj + 4, 2); padin_wr32(ram, obj + 36, 520);                                                  /* the player */
@@ -59,6 +59,13 @@ int main(void) {
     padin_wr32(ram, 0x800c7a4c, 2); padin_wr32(ram, decoy + 4, 2);                                                /* two objects with the id and the same heading: ambiguous, not trusted */
     padin_wr32(ram, decoy + 36, padin_rd32(ram, obj + 36)); ls.obj = 0; assert(!padin_look_step(&lp, &ls, ram, 5.0, 1.0, 0));
     padin_wr32(ram, decoy + 4, 258); assert(padin_look_step(&lp, &ls, ram, 20.0, 1.0, 0) && ls.obj == obj);       /* unique again */
+    /* aiming: the lock byte is set, the mouse turns the player and leaves the orbit alone; a pending orbit is committed first */
+    uint32_t h0 = padin_rd32(ram, obj + 36); padin_wr32(ram, 0x800bbe2c, 0); ram[0x800e1990 & 0x1FFFFF] = 255;
+    for (int i = 0; i < 100; i++) padin_look_step(&lp, &ls, ram, 10.0, 1.0, 0);                                   /* 1000 px right while aiming: heading grows by 350 */
+    assert(padin_rd32(ram, 0x800bbe2c) == 0 && padin_rd32(ram, obj + 36) == ((h0 + 350) & 1023));
+    padin_wr32(ram, 0x800bbe2c, 100); uint32_t hh = padin_rd32(ram, obj + 36);
+    assert(padin_look_step(&lp, &ls, ram, 0.0, 1.0, 0) && padin_rd32(ram, 0x800bbe2c) == 0 && padin_rd32(ram, obj + 36) == ((hh - 100) & 1023));   /* entering the lock commits the orbit */
+    ram[0x800e1990 & 0x1FFFFF] = 0;
     lp.enabled = 0; assert(!padin_look_step(&lp, &ls, ram, 50.0, 1.0, 1));
     PadCfg c2; padin_defaults(&c2); assert(c2.camera == 1);
     assert(padin_line(&c2, "mouse_mode turn") == 0 && c2.camera == 0 && padin_line(&c2, "mouse_mode camera") == 0 && c2.camera == 1 && padin_line(&c2, "mouse_mode x") == 1);

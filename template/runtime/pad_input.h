@@ -113,7 +113,7 @@ static inline uint32_t padin_mouse_turn(MouseLook *m, double dx, double sens) {
  * global that is 0 in normal play, and a camera function eases the view toward that target. Adding to the orbit swings the camera round the player without turning him; to walk toward where
  * the camera looks the player is turned by the orbit amount and the orbit is zeroed (heading -= orbit, orbit = 0 leaves the view target unchanged). The player's object is found by its id and
  * by the heading copy (the object list is not walked), then checked every frame. */
-typedef struct { uint32_t yaw_addr; int bits; uint32_t id_addr, copy_addr; int head_off; int sign; double scale; int enabled; } LookProfile;   /* scale: angle units per mouse pixel */
+typedef struct { uint32_t yaw_addr; int bits; uint32_t id_addr, copy_addr; int head_off; int sign; double scale; uint32_t lock_addr; int enabled; } LookProfile;   /* scale: angle units per mouse pixel; lock_addr: byte, non-zero while the game's view is locked to the player's heading (aiming) - 0 = no such flag */
 typedef struct { double acc; uint32_t obj; } LookState;
 static inline uint32_t padin_rd32(const uint8_t *ram, uint32_t a) { uint32_t v; memcpy(&v, ram + (a & 0x1FFFFC), 4); return v; }
 static inline void padin_wr32(uint8_t *ram, uint32_t a, uint32_t v) { memcpy(ram + (a & 0x1FFFFC), &v, 4); }
@@ -130,11 +130,18 @@ static inline int padin_look_find(const LookProfile *p, LookState *st, const uin
 }
 /* dx: mouse pixels since the last frame; walking: a movement key is held. Returns 1 if memory was written. */
 static inline int padin_look_step(const LookProfile *p, LookState *st, uint8_t *ram, double dx, double sens, int walking) {
-    if (!p->enabled || (dx == 0.0 && !walking)) return 0;
+    if (!p->enabled) return 0;
+    int locked = p->lock_addr && ram[p->lock_addr & 0x1FFFFF] != 0;
+    if (dx == 0.0 && !walking && !(locked && padin_rd32(ram, p->yaw_addr) != 0)) return 0;        /* nothing to do (and no scan for the player object) */
     uint32_t mask = (1u << p->bits) - 1, orbit = padin_rd32(ram, p->yaw_addr) & mask; int wrote = 0;
-    if (!padin_look_find(p, st, ram)) return 0;
+    if (!padin_look_find(p, st, ram)) return 0;       /* aiming: the view follows the heading at once, so the mouse turns the player (an orbit would swing the view away from where he aims) */
+    if (locked && dx != 0.0) {
+        st->acc += dx * sens * p->scale * -p->sign; int whole = (int)st->acc; st->acc -= whole;
+        if (whole) { uint32_t h = padin_rd32(ram, st->obj + (uint32_t)p->head_off); padin_wr32(ram, st->obj + (uint32_t)p->head_off, (uint32_t)((int)h + whole) & mask); wrote = 1; }
+        dx = 0.0;
+    }
     if (dx != 0.0) { st->acc += dx * sens * p->scale * p->sign; int whole = (int)st->acc; st->acc -= whole; if (whole) { orbit = (uint32_t)((int)orbit + whole) & mask; padin_wr32(ram, p->yaw_addr, orbit); wrote = 1; } }
-    if (walking && orbit) {
+    if ((walking || locked) && orbit) {
         uint32_t h = padin_rd32(ram, st->obj + (uint32_t)p->head_off);
         padin_wr32(ram, st->obj + (uint32_t)p->head_off, (h - orbit) & mask); padin_wr32(ram, p->yaw_addr, 0); wrote = 1;
     }

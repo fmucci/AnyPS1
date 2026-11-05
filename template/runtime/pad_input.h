@@ -51,7 +51,7 @@ static inline void padin_defaults(PadCfg *c) {
     memset(c, 0, sizeof *c);
     padin_scheme(c, 1);
     c->mouse_on = 1; c->sens = 1.0; c->camera = 1;
-    c->mouse_btn[0] = padin_bit("square"); c->mouse_btn[1] = padin_bit("circle"); c->mouse_btn[2] = padin_bit("triangle");
+    c->mouse_btn[0] = padin_bit("square"); c->mouse_btn[1] = padin_bit("triangle"); c->mouse_btn[2] = padin_bit("circle");
 }
 
 /* One text line: "scheme wasd|classic", "mouse on|off", "sensitivity 1.5", "key W up" (key names with spaces: "key Left Shift = l1"), "mouse_left square", "unbind W".

@@ -9,7 +9,7 @@ int main(void) {
     PadCfg c; padin_defaults(&c);
     assert(find(&c, "W") == 12 && find(&c, "A") == 15 && find(&c, "S") == 14 && find(&c, "D") == 13);      /* WASD walks */
     assert(find(&c, "Up") == 12 && find(&c, "Z") == 6 && find(&c, "Return") == 11);
-    assert(c.mouse_on == 1 && c.mouse_btn[0] == 7 && c.mouse_btn[1] == 5 && c.mouse_btn[2] == 4);
+    assert(c.mouse_on == 1 && c.mouse_btn[0] == 7 && c.mouse_btn[1] == 4 && c.mouse_btn[2] == 5);
     padin_scheme(&c, 0);                                                                                     /* the first versions' layout */
     assert(find(&c, "W") == 3 && find(&c, "A") == 7 && find(&c, "S") == 4 && find(&c, "D") == -99);
 

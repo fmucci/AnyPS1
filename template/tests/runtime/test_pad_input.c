@@ -72,6 +72,18 @@ int main(void) {
     for (unsigned t = 0; t < 15; t++) { uint32_t w = padin_walk(4 | 8, t); assert(w == ~(1u << 14) || w == ~(1u << 0)); }          /* S+A: back / L2 */
     PadCfg c2; padin_defaults(&c2); assert(c2.camera == 1);
     assert(padin_line(&c2, "mouse_mode turn") == 0 && c2.camera == 0 && padin_line(&c2, "mouse_mode camera") == 0 && c2.camera == 1 && padin_line(&c2, "mouse_mode x") == 1);
+    /* game controller sticks */
+    assert(padin_stick_dirs(0, 0) == 0 && padin_stick_dirs(3000, -3000) == 0);                                    /* dead zone */
+    assert(padin_stick_dirs(0, -32767) == 1 && padin_stick_dirs(32767, 0) == 2 && padin_stick_dirs(0, 32767) == 4 && padin_stick_dirs(-32767, 0) == 8);   /* up, right, down, left */
+    assert(padin_stick_dirs(23000, -23000) == (1 | 2) && padin_stick_dirs(-23000, -23000) == (1 | 8));          /* diagonals */
+    assert(padin_stick_dirs(23000, 23000) == (4 | 2) && padin_stick_dirs(-23000, 23000) == (4 | 8));
+    assert(padin_stick_dirs(30000, -9000) == 2 && padin_stick_dirs(9000, -30000) == 1);                           /* mostly one axis: not a diagonal */
+    assert(padin_stick_look(0, 18.0) == 0.0 && padin_stick_look(4000, 18.0) == 0.0);                              /* dead zone */
+    assert(fabs(padin_stick_look(32767, 18.0) - 18.0) < 1e-9 && fabs(padin_stick_look(-32768, 18.0) + 18.0) < 0.01);
+    assert(padin_stick_look(16000, 18.0) > 0.0 && padin_stick_look(16000, 18.0) < padin_stick_look(24000, 18.0));   /* grows with the deflection */
+    PadCfg c3; padin_defaults(&c3); assert(c3.pad_r1 == 3 && c3.pad_r2 == 1 && fabs(c3.stick_speed - 18.0) < 1e-9);
+    assert(padin_line(&c3, "pad_r1 triangle") == 0 && padin_line(&c3, "pad_r2 square") == 0 && c3.pad_r1 == 4 && c3.pad_r2 == 7);
+    assert(padin_line(&c3, "stick_speed 30") == 0 && c3.stick_speed == 30.0 && padin_line(&c3, "stick_speed 0") == 1 && padin_line(&c3, "pad_r1 bogus") == 1);
     printf("pad_input tests passed\n");
     return 0;
 }

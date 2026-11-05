@@ -1,6 +1,6 @@
 /* Native player: the whole-game build with a window, sound and input (queue P5-3). SDL2.
  *   ps1_play DISC.bin [--card FILE] [--scale N] [--fullscreen] [--no-sync] [--ticks N] [--record FILE]
- * Keys (input.cfg, written on first start): WASD/arrows = d-pad, J/K/L/I = square/cross/circle/triangle, Q/E = L1/R1, R/F = L2/R2, Enter = start, Right Shift = select, mouse sideways = turn (F10 = release the mouse), F11 = fullscreen, Esc = quit, hold Tab = fast forward, F12 = screenshot.
+ * Keys (input.cfg, written on first start): WASD/arrows = d-pad (W/S walk, A/D side-step, no turning), Q/E/F/Space = square/circle/triangle/cross, 1/2/3/4 = R1/R2/L1/L2, Enter = start, Right Shift = select, mouse sideways = turn the player (F10 = release the mouse and get the classic d-pad keys), F11 = fullscreen, Esc = quit, hold Tab = fast forward, F12 = screenshot.
  * Game pads (SDL game controller mapping) work too. Build: python3 -I tools/recomp/build_game.py --frontend */
 #include <SDL.h>
 #include <setjmp.h>
@@ -26,7 +26,7 @@ typedef struct {
     SDL_AudioDeviceID audio; SDL_GameController *pad;
     FILE *rec; uint32_t last_word;
     uint8_t *rgb; int sync; uint64_t t0; unsigned frame; int fullscreen; int quit; int ff;
-    PadCfg cfg; SDL_Scancode kc[PADIN_MAXBIND]; MouseLook ml; LookState look; double mdx, look_dx; int grab, want_grab;       /* keyboard layout (input.cfg) and mouse look */
+    PadCfg cfg; SDL_Scancode kc[PADIN_MAXBIND]; MouseLook ml; LookState look; double mdx, look_dx, stick_dx; int grab, want_grab, rel, kdir, sdir;       /* keyboard layout (input.cfg) and mouse look */
 } Host;
 
 /* Pad word as the BIOS pad call returns it (bit map of runtime/hle.c `rt_pad_script_add`, active low, the 16 bits of pad 1 in the low half): select 8, L3 9, R3 10, start 11,
@@ -35,11 +35,16 @@ static uint32_t pad_word(Host *h) {
     const Uint8 *k = SDL_GetKeyboardState(NULL);
     uint32_t w = 0xFFFFFFFFu;
     #define B(cond, bit) do { if (cond) w &= ~(1u << (bit)); } while (0)
-    for (int i = 0; i < h->cfg.n; i++) if (h->cfg.b[i].bit >= 0 && k[h->kc[i]]) B(1, h->cfg.b[i].bit);       /* input.cfg: see runtime/pad_input.h */
+    h->rel = h->cfg.camera && LOOK_PROFILE.enabled && h->grab;                                           /* camera-relative walking while the mouse is captured (F10 = classic d-pad keys for menus) */
+    h->kdir = 0; h->sdir = 0; h->stick_dx = 0;
+    for (int i = 0; i < h->cfg.n; i++) if (h->cfg.b[i].bit >= 0 && k[h->kc[i]]) {                       /* input.cfg: see runtime/pad_input.h */
+        int bt = h->cfg.b[i].bit;
+        if (h->rel && bt >= 12 && bt <= 15) h->kdir |= 1 << (bt - 12); else B(1, bt);
+    }
     if (h->grab) {                                                                                         /* mouse look: horizontal motion presses left/right, the buttons are bound in input.cfg */
         Uint32 mb = SDL_GetMouseState(NULL, NULL);
         for (int i = 0; i < 3; i++) if (h->cfg.mouse_btn[i] >= 0 && (mb & SDL_BUTTON(i == 0 ? SDL_BUTTON_LEFT : i == 1 ? SDL_BUTTON_RIGHT : SDL_BUTTON_MIDDLE))) B(1, h->cfg.mouse_btn[i]);
-        if (h->cfg.camera && LOOK_PROFILE.enabled) h->look_dx = h->mdx;                                  /* camera mode: the tick hook writes the game's orbit angle */
+        if (h->cfg.camera && LOOK_PROFILE.enabled) h->look_dx = h->mdx;                                  /* camera mode: the tick hook writes the player's heading */
         else w &= padin_mouse_turn(&h->ml, h->mdx, h->cfg.sens);
         h->mdx = 0;
     }
@@ -48,12 +53,15 @@ static uint32_t pad_word(Host *h) {
         B(SDL_GameControllerGetButton(g, SDL_CONTROLLER_BUTTON_BACK), 8); B(SDL_GameControllerGetButton(g, SDL_CONTROLLER_BUTTON_START), 11);
         B(SDL_GameControllerGetButton(g, SDL_CONTROLLER_BUTTON_DPAD_UP), 12); B(SDL_GameControllerGetButton(g, SDL_CONTROLLER_BUTTON_DPAD_RIGHT), 13);
         B(SDL_GameControllerGetButton(g, SDL_CONTROLLER_BUTTON_DPAD_DOWN), 14); B(SDL_GameControllerGetButton(g, SDL_CONTROLLER_BUTTON_DPAD_LEFT), 15);
-        B(SDL_GameControllerGetAxis(g, SDL_CONTROLLER_AXIS_TRIGGERLEFT) > 8000, 0); B(SDL_GameControllerGetAxis(g, SDL_CONTROLLER_AXIS_TRIGGERRIGHT) > 8000, 1);
-        B(SDL_GameControllerGetButton(g, SDL_CONTROLLER_BUTTON_LEFTSHOULDER), 2); B(SDL_GameControllerGetButton(g, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER), 3);
+        B(SDL_GameControllerGetAxis(g, SDL_CONTROLLER_AXIS_TRIGGERLEFT) > 8000, 0); B(SDL_GameControllerGetAxis(g, SDL_CONTROLLER_AXIS_TRIGGERRIGHT) > 8000, h->cfg.pad_r2 >= 0 ? h->cfg.pad_r2 : 1);      /* R2 / R1: bound in input.cfg (pad_r1, pad_r2) */
+        B(SDL_GameControllerGetButton(g, SDL_CONTROLLER_BUTTON_LEFTSHOULDER), 2); B(SDL_GameControllerGetButton(g, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER), h->cfg.pad_r1 >= 0 ? h->cfg.pad_r1 : 3);
         B(SDL_GameControllerGetButton(g, SDL_CONTROLLER_BUTTON_Y), 4); B(SDL_GameControllerGetButton(g, SDL_CONTROLLER_BUTTON_B), 5);
         B(SDL_GameControllerGetButton(g, SDL_CONTROLLER_BUTTON_A), 6); B(SDL_GameControllerGetButton(g, SDL_CONTROLLER_BUTTON_X), 7);
         int lx = SDL_GameControllerGetAxis(g, SDL_CONTROLLER_AXIS_LEFTX), ly = SDL_GameControllerGetAxis(g, SDL_CONTROLLER_AXIS_LEFTY);
-        B(ly < -16000, 12); B(lx > 16000, 13); B(ly > 16000, 14); B(lx < -16000, 15);
+        if (h->cfg.camera && LOOK_PROFILE.enabled) {                                                      /* camera mode: the left stick walks like WASD, the right stick turns like the mouse */
+            h->sdir = padin_stick_dirs(lx, ly);
+            h->stick_dx = padin_stick_look(SDL_GameControllerGetAxis(g, SDL_CONTROLLER_AXIS_RIGHTX), h->cfg.stick_speed);
+        } else { B(ly < -16000, 12); B(lx > 16000, 13); B(ly > 16000, 14); B(lx < -16000, 15); }
     }
     #undef B
     return w;
@@ -61,19 +69,22 @@ static uint32_t pad_word(Host *h) {
 
 static const char INPUT_CFG_DEFAULT[] =
     "# Keyboard and mouse layout. Lines starting with # are comments. Delete this file to get the defaults back.\n"
-    "# scheme wasd      W/A/S/D walk (same as the arrow keys), Q/E = L1/R1, R/F = L2/R2, J/K/L/I = square/cross/circle/triangle, Space = cross\n"
+    "# scheme wasd      W/A/S/D walk (same as the arrow keys), Q/E/F/Space = square/circle/triangle/cross, 1/2/3/4 = R1/R2/L1/L2 (Z/X = cross/circle also work)\n"
     "# scheme classic   the first versions' layout: Z/X/A/S = cross/circle/square/triangle, Q/W = L1/R1, E/R = L2/R2\n"
     "scheme wasd\n"
     "# Mouse look: moving the mouse sideways presses left/right (the game's pad is digital, so the turn speed is the game's own).\n"
     "# F10 releases/captures the mouse (use it in menus). Higher sensitivity = less motion for the same turn.\n"
     "mouse on\n"
-    "# mouse_mode camera : sideways motion swings the game camera round the player (writes the game's memory; a .rec recording does not capture it). turn : left/right presses (reproducible).\n"
+    "# mouse_mode camera : the mouse turns the player on the spot (the camera follows) and W/A/S/D and the arrows walk without turning him: W forward, S back, A/D = the game's L2/R2 side-step, W+A / W+D = a diagonal made by alternating forward and side-step (writes the game's memory; a .rec recording does not capture it; F10 gives the classic d-pad keys back for menus). turn : left/right presses, classic tank keys (reproducible).\n"
     "mouse_mode camera\n"
     "sensitivity 1.0\n"
     "# Mouse buttons -> pad buttons (none, up, down, left, right, cross, circle, square, triangle, l1, r1, l2, r2, l3, r3, start, select)\n"
     "mouse_left square\n"
-    "mouse_right circle\n"
-    "mouse_middle triangle\n"
+    "mouse_right triangle\n"
+    "mouse_middle circle\n"
+    "# Game controller (camera mode): the left stick walks like WASD, the right stick turns like the mouse, R1 and R2 can be rebound with pad_r1 / pad_r2; the d-pad and the other buttons are unchanged.\n"
+    "# stick_speed = mouse pixels per frame at full right-stick deflection\n"
+    "stick_speed 18\n"
     "# Extra keys: key <SDL key name> <button>, for example:  key Left Shift l1      key Tab none   (Tab is fast-forward and cannot be rebound)\n";
 
 static void load_input(Host *h, int write_default) {
@@ -174,8 +185,13 @@ static void tick_hook(Cpu *c, void *ud) {
     { static unsigned seen, quiet; unsigned g = rt_hle_card_gen();                                 /* the card is written to disk 30 frames after the game's last change to it, so a force-quit, a crash or a power loss keeps the save (it was written only at exit) */
       if (g != seen) { seen = g; quiet = 0; } else if (quiet < 1000 && ++quiet == 30 && !rt_hle_card_save()) fprintf(stderr, "[play] could not write the memory card\n"); }
     if (h->quit) { rt_hle_card_save(); SDL_Quit(); exit(0); }
-    { h->look_dx = 0; uint32_t w = pad_word(h); if (!g_scripted) rt_pad_set(w);
-      if (!g_scripted && LOOK_PROFILE.enabled && h->cfg.camera) padin_look_step(&LOOK_PROFILE, &h->look, rt_ram_ptr(c), h->look_dx, h->cfg.sens, (w & 0xF000u) != 0xF000u);       /* any d-pad direction held: turn the player toward where the camera looks */
+    { h->look_dx = 0; uint32_t w = pad_word(h);
+      if (h->rel || h->sdir || h->stick_dx != 0.0) {                                                  /* keys / left stick walk relative to the camera without turning the player; mouse / right stick turn him (findings 0052) */
+          int dirs = h->kdir | h->sdir; double dx = h->look_dx + h->stick_dx;
+          if (padin_look_player(&LOOK_PROFILE, rt_ram_ptr(c))) { w &= padin_walk(dirs, rt_hle_ticks()); padin_look_step(&LOOK_PROFILE, &h->look, rt_ram_ptr(c), dx, h->cfg.sens); }
+          else for (int b = 0; b < 4; b++) if (dirs & (1 << b)) w &= ~(1u << (12 + b));                  /* no trusted player (loading, menus): the keys / stick act as a d-pad */
+      }
+      if (!g_scripted) rt_pad_set(w);
                                     /* the input of the next frame is sampled as late as possible */
       if (h->rec && w != h->last_word) { fprintf(h->rec, "%u %08x\n", rt_hle_ticks() + 1, w); fflush(h->rec); h->last_word = w; } }       /* recorded for the NEXT frame (replay applies it from that tick on) */
 }
@@ -236,9 +252,10 @@ int main(int argc, char **argv) {
     want.freq = 44100; want.format = AUDIO_S16SYS; want.channels = 2; want.samples = 2048;
     h.audio = SDL_OpenAudioDevice(NULL, 0, &want, &have, 0);
     if (h.audio) SDL_PauseAudioDevice(h.audio, 0); else fprintf(stderr, "[play] audio device could not be opened: %s\n", SDL_GetError());
+    if (h.audio) fprintf(stderr, "[play] audio device: %d Hz, format %04x, %d channels, %d samples (asked 44100 Hz, 2 channels, 2048 samples)\n", have.freq, (unsigned)have.format, have.channels, have.samples);
     for (int i = 0; i < SDL_NumJoysticks(); i++) if (SDL_IsGameController(i)) { h.pad = SDL_GameControllerOpen(i); break; }
     load_input(&h, !g_scripted);
-    h.want_grab = (h.cfg.mouse_on && !g_scripted && !SDL_getenv("SDL_VIDEODRIVER")) ? 1 : -1;               /* -1: no mouse look (scripted run, headless driver or "mouse off") */
+    h.want_grab = (h.cfg.mouse_on && !g_scripted && strcmp(SDL_GetCurrentVideoDriver() ? SDL_GetCurrentVideoDriver() : "", "dummy")) ? 1 : -1;       /* -1: no mouse look (scripted run, headless driver or "mouse off") */
     if (h.want_grab > 0) set_grab(&h, 1);
     h.t0 = SDL_GetPerformanceCounter();
     Cpu cpu, *c = &cpu;

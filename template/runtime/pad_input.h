@@ -5,6 +5,7 @@
 #ifndef PAD_INPUT_H
 #define PAD_INPUT_H
 #include <ctype.h>
+#include <math.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -18,6 +19,8 @@ typedef struct {
     double sens;                                              /* 1.0 = 10 pixels of motion per frame for a full-speed turn */
     int camera;                                               /* 1: mouse sideways turns the player by writing the game's heading (needs a LookProfile); 0: left/right presses */
     int mouse_btn[3];                                         /* pad bit for left / right / middle button, -1 = none */
+    int pad_r1, pad_r2;                                       /* pad bit that a game controller's R1 / R2 (right shoulder / right trigger) press */
+    double stick_speed;                                       /* camera mode: mouse pixels per frame that the right stick gives at full deflection */
 } PadCfg;
 
 static inline int padin_bit(const char *name) {
@@ -51,6 +54,7 @@ static inline void padin_defaults(PadCfg *c) {
     memset(c, 0, sizeof *c);
     padin_scheme(c, 1);
     c->mouse_on = 1; c->sens = 1.0; c->camera = 1;
+    c->pad_r1 = padin_bit("r1"); c->pad_r2 = padin_bit("r2"); c->stick_speed = 18.0;
     c->mouse_btn[0] = padin_bit("square"); c->mouse_btn[1] = padin_bit("triangle"); c->mouse_btn[2] = padin_bit("circle");
 }
 
@@ -73,6 +77,8 @@ static inline int padin_line(PadCfg *c, const char *line) {
         int i = !strcmp(cmd + 6, "left") ? 0 : !strcmp(cmd + 6, "right") ? 1 : !strcmp(cmd + 6, "middle") ? 2 : -1;
         int bit = padin_bit(rest); if (i < 0 || bit == -2) return 1; c->mouse_btn[i] = bit; return 0;
     }
+    if (!strcmp(cmd, "pad_r1") || !strcmp(cmd, "pad_r2")) { int bit = padin_bit(rest); if (bit == -2) return 1; if (cmd[5] == '1') c->pad_r1 = bit; else c->pad_r2 = bit; return 0; }
+    if (!strcmp(cmd, "stick_speed")) { double v = atof(rest); if (v <= 0.0 || v > 200.0) return 1; c->stick_speed = v; return 0; }
     if (!strcmp(cmd, "unbind")) { for (int i = 0; i < c->n; i++) if (!strcmp(c->b[i].key, rest)) { c->b[i] = c->b[--c->n]; return 0; } return 1; }
     if (!strcmp(cmd, "key")) {                                /* the button is the last word, the key name is what is in front of it */
         char *sp = strrchr(rest, ' '); if (!sp) return 1;
@@ -133,6 +139,26 @@ static inline int padin_look_step(const LookProfile *p, LookState *st, uint8_t *
     uint32_t mask = (1u << p->bits) - 1, h = padin_rd32(ram, o + (uint32_t)p->head_off);
     padin_wr32(ram, o + (uint32_t)p->head_off, (uint32_t)((int)h + whole) & mask);
     return 1;
+}
+
+/* Analogue sticks of a game controller (axes -32768..32767, y down). Left stick -> the same 4-bit direction mask as the keys (bit0 up, bit1 right, bit2 down, bit3 left): outside a dead zone of
+ * 40 % the direction is 8-way (a diagonal when the angle is within 22.5..67.5 degrees of an axis). Right stick x -> mouse pixels per frame for the camera, dead zone 15 %, squared response. */
+static inline int padin_stick_dirs(int x, int y) {
+    double fx = x / 32767.0, fy = y / 32767.0;
+    if (fx * fx + fy * fy < 0.16) return 0;
+    double a = atan2(fx, -fy) * 180.0 / 3.14159265358979323846;               /* 0 = up, 90 = right, +-180 = down */
+    int m = 0;
+    if (fabs(a) < 67.5) m |= 1;
+    if (a > 22.5 && a < 157.5) m |= 2;
+    if (fabs(a) > 112.5) m |= 4;
+    if (a < -22.5 && a > -157.5) m |= 8;
+    return m;
+}
+static inline double padin_stick_look(int x, double speed) {
+    double f = x / 32767.0, m = fabs(f);
+    if (m < 0.15) return 0.0;
+    m = (m - 0.15) / 0.85; if (m > 1.0) m = 1.0;
+    return (f < 0 ? -1.0 : 1.0) * m * m * speed;
 }
 
 /* Walking relative to the camera without turning the player (finding 0052, addendum 5). The game's d-pad turns the player (tank controls), but it has a side-step: L2 / R2 move him sideways with

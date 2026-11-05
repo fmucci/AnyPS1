@@ -65,3 +65,4 @@
 - 2026-11-05 · template: LookProfile reworked (mouse turns the player's heading, player found through three pointer globals); docs/23 rewritten; default mouse buttons left=square right=triangle middle=circle
 - 2026-11-05 · template: camera-relative walking (`padin_look_move`, profile `orbit_addr`) and docs/23 section
 - 2026-11-05 · template: keys walk without turning the player (`padin_walk`: up/down/L2/R2 side-step, diagonal by alternating), camera-offset code removed; docs/23
+- 2026-11-05 · template player: game controller sticks (left = walking, right = camera) in camera mode, `pad_r1`/`pad_r2`/`stick_speed` in input.cfg, audio-device log line; the template frontend resynced with the f2b player (it had fallen behind the header)
